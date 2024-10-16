@@ -1,5 +1,5 @@
 <head>
-    <title>This is a CSS note.</title>
+    <title>This is a JavaScript note.</title>
     <style type="text/css">
         body {
             font-family: "cascadia code", 幼圆, 宋体;
@@ -156,7 +156,49 @@
   - [Object](#object)
   - [Array](#array)
     - [创建数组](#创建数组)
+    - [数组空位](#数组空位)
+    - [数组索引](#数组索引)
+    - [检测数组](#检测数组)
+    - [迭代器方法](#迭代器方法)
+    - [复制和填充方法](#复制和填充方法)
+    - [转换方法](#转换方法)
+    - [栈方法与队列方法](#栈方法与队列方法)
+    - [排序方法](#排序方法)
+    - [操作方法](#操作方法)
+    - [搜索和位置方法](#搜索和位置方法)
+      - [严格相等](#严格相等)
+      - [断言比较](#断言比较)
+    - [迭代方法](#迭代方法)
+    - [归并方法](#归并方法)
+  - [定型数组](#定型数组)
+    - [ArrayBuffer](#arraybuffer)
+    - [DataView](#dataview)
+      - [ElementType](#elementtype)
+      - [字节序](#字节序)
+      - [其他](#其他)
+    - [定型数组](#定型数组-1)
+      - [定型数组行为](#定型数组行为)
+      - [合并,复制和修改定型数组](#合并复制和修改定型数组)
+      - [上溢和下溢](#上溢和下溢)
+  - [Map](#map)
+    - [基本API](#基本api)
+    - [顺序与迭代](#顺序与迭代)
+    - [选择Object还是Map](#选择object还是map)
+  - [WeakMap](#weakmap)
+    - [基本API](#基本api-1)
+    - [弱键](#弱键)
+    - [不可迭代键](#不可迭代键)
+  - [Set](#set)
+    - [基本API](#基本api-2)
+    - [顺序与迭代](#顺序与迭代-1)
+    - [自定义集合操作](#自定义集合操作)
+  - [WeakSet](#weakset)
+    - [基本API](#基本api-3)
+    - [弱值](#弱值)
+    - [不可迭代键](#不可迭代键-1)
+  - [迭代与扩展操作](#迭代与扩展操作)
 - [迭代器与生成器](#迭代器与生成器)
+  - [理解迭代](#理解迭代)
 - [对象,类,面向对象编程](#对象类面向对象编程)
   - [对象](#对象)
     - [属性的类型](#属性的类型)
@@ -243,7 +285,7 @@
       - [拦截的操作](#拦截的操作)
       - [捕获器处理程序参数](#捕获器处理程序参数)
       - [捕获器不变式](#捕获器不变式-1)
-    - [set()](#set)
+    - [set()](#set-1)
       - [返回值](#返回值-1)
       - [拦截的操作](#拦截的操作-1)
       - [捕获器处理程序参数](#捕获器处理程序参数-1)
@@ -3231,8 +3273,999 @@ let values = [1,2,];    // 创建一个包含2个元素的数组,末尾的逗号
 ````
 注意,在使用数组字面量表示法创建数组不会调用`Array`的构造函数.
 
+使用`from()`静态方法将类数组结构转换为数组实例.其第一个参数可以是任何可迭代的结构,或者由有一个`length`属性和可索引元素的结构:
+````JS
+console.log(Array.from("Matt"));    // ['M', 'a', 't', 't']
+console.log(Array.from(new Map().set(1,2)
+                                .set(3,4)));    // [[1,2],[3,4]]
+console.log(Array.from(new Set().add(1)
+                                .add(2)
+                                .add(3)
+                                .add(4)));  // [1,2,3,4]
+// Array.from()对现有数组执行浅复制
+const a1 = [1,2,3,4];
+const a2 = Array.from(a1);
+console.log(a2);    // [1,2,3,4]
+console.log(a1 === a2); // false
+
+const iter = {
+    *[Symbol.iterator]() {
+        yield 1;
+        yield 2;
+        yield 3;
+        yield 4;
+    }
+};
+console.log(Array.from(iter));  // [1,2,3,4]
+const arrayLikeObj = {
+    0: 1,
+    1: 2,
+    2: 3,
+    3: 4,
+    length: 4
+};
+console.log(Array.from(arrayLikeObj));  // [1,2,3,4]
+````
+`Array.from()`接受第二个可选的映射函数参数,该映射函数会应用于数组中的每一项数据.还可以接收第三个可选参数,用于指定映射函数中`this`的值.但这个重写的`this`值在箭头函数中不适用.
+````JS
+const a1 = [1,2,3,4];
+const a2 = Array.from(a1, x => x**2);
+const a3 = Array.from(a1, function(x) { return x**this.exponent }, {exponent: 2});
+console.log(a2);    // [1,4,9,16]
+console.log(a3);    // [1,4,9,16]
+````
+
+`Array.of()`将一组参数转换为数组:
+````JS
+console.log(Array.of(1,2,3,4)); // [1,2,3,4]
+console.log(Array.of(undefined));   // [undefined]
+````
+
+### 数组空位
+使用字面量初始化数组时,可以使用一串逗号来创建空位.ES6新增的方法和迭代器几乎都把空位当成存在的元素,且为`undefined`;而ES6之前的方法则会忽略空位.**因此建议避免使用数组空位,或者显式地使用undefined值代替**.
+````JS
+const a1 = [,,,,,];
+console.log(a1.length); // 5
+console.log(a1);    // [空 ×5]
+const a2 = [,,,,1,];
+console.log(a2.length); // 5
+const a3 = [1,,,,2];
+console.log(a3.length); // 5
+const a4 = [,1,,2,3,];
+console.log(a4.length); // 5
+console.log(a4);    // [空, 1, 空, 2, 3]
+````
+````JS
+// 迭代
+const options = [1,,,,5];
+for (const option of options) {
+    console.log(option === undefined);
+}
+// false
+// true
+// true
+// true
+// false
+
+// ES6之后的方法
+const a = Array.from([,,,]);
+console.log(Array.of(...[,,,]));    // [undefined, undefined, undefined]
+// ES6之前的方法
+const arr = [1,,,,5];
+// map()会跳过空位置而不将其设置为6
+console.log(arr.map(() => 6));  // [6, 空 ×3, 6]
+````
+
+### 数组索引
+使用中括号来提供数字索引:
+````JS
+let colors = ['red', 'blue', 'green'];
+console.log(colors[0]);     // 显式第一项,red
+colors[2] = 'black';        // 修改'green'为'black'
+colors[3] = 'brown';        // 第四项不存在,因此添加第四项
+console.log(colors);        // ['red', 'blue', 'black', 'brown']
+````
+
+`length`表示数组长度:
+````JS
+let colors = ['red', 'blue', 'green'];
+let names = [];
+console.log(colors.length); // 3
+console.log(names.length);  // 0
+````
+
+可以修改`length`来删除或扩充元素:
+````JS
+let arr = [1,2,3,4];
+arr.length = 3; // 删除了末尾的4
+console.log(arr[3]);    // undefined
+arr.length = 4; // 将数组从3个元素扩充到了4个
+console.log(arr);       // [1, 2, 3, 空]
+arr[arr.length] = arr.length;
+console.log(arr);       // [1, 2, 3, 空, 4]
+console.log(arr.length);    // 5
+arr[100] = 5;
+console.log(arr[99]);   // undefined
+console.log(arr.length);    // 101
+````
+
+数组最多可以包含`2^32-1`个元素.
+
+### 检测数组
+单个网页中,使用`value instanceof Array`可以判断一个对象是不是数组.
+
+但如果网页中有多个框架,则可能涉及两个不同的全局执行上下文,因此就会有两个不同版本的`Array`构造函数.使用`isArray()`静态方法可以忽略执行上下文确定一个值是否为数组:
+````JS
+if (Array.isArray(value)) {}
+````
+
+### 迭代器方法
+`Array`的原型上暴露了3个用于检索数组内容的方法:`keys()`,`values()`和`entries()`.
+
+`keys()`返回数组索引的迭代器,`values()`返回数组元素的迭代器,`entries()`返回索引/值对的迭代器:
+````JS
+const a = ['foo', 'bar', 'baz', 'qux'];
+const aKeys = Array.from(a.keys());
+const aValues = Array.from(a.values());
+const aEntries = Array.from(a.entries());
+console.log(aKeys);     // [0, 1, 2, 3]
+console.log(aValues);   // ['foo', 'bar', 'baz', 'qux']
+console.log(aEntries);  // [[0, 'foo'], [1, 'bar'], [2, 'baz'], [3, 'qux']]
+console.log(a.keys());  // Array Iterator {...}
+for (const [idx, element] of a.entries()) {
+    console.log(idx);
+}
+// 0
+// 1
+// 2
+// 3
+````
+
+### 复制和填充方法
+批量复制方法`copyWithin()`和填充数组方法`fill()`都需要指定一个左闭右开的区间.这两个方法不会改变数组的大小.
+
+`fill()`方法项一个已有的数组中插入全部或部分相同的值.第一个参数是填充值.第二个参数是开始索引,默认值是`0`.第三个参数是结束索引(不包括),默认值是`length`.索引为负值表示从末尾开始计算.超出数组边界,零长度,方向相反的索引范围都会被忽略:
+````JS
+const arr = [0,0,0,0,0];
+arr.fill(5, 2, -1);
+console.log(arr);   // [0, 0, 5, 5, 0]
+arr.fill(0);
+arr.fill(1, 2, 10); // [2,5)没有超出索引范围
+console.log(arr);   // [0, 0, 1, 1, 1]
+arr.fill(3, -10, 0);    // 忽略
+````
+
+`copyWithin()`会按照指定范围浅复制数组中的部分内容,然后替换(插入)指定开始索引的位置.索引的计算方法同`fill()`:
+````JS
+let ints,
+    reset = () => ints = [0,1,2,3,4,5,6,7,8,9];
+reset();
+// 第一个参数是插入的索引
+ints.copyWithin(5);
+console.log(ints);  // [0,1,2,3,4,0,1,2,3,4]
+reset();
+
+// 第二个参数是复制索引开始的位置.默认为0
+ints.copyWithin(0, 5);
+console.log(ints);  // [5,6,7,8,9,5,6,7,8,9]
+reset();
+
+// 第三个参数是复制索引结束的位置.默认为length
+ints.copyWithin(4, 0, 3);
+console.log(ints);  // [0,1,2,3,0,1,2,7,8,9]
+````
+
+### 转换方法
+`valueOf()`返回数组本身.`toString()`返回数组中每个元素调用`toString()`的返回值并用`,`拼接返回的字符串.`toLocaleString()`则是调用每个元素的`toLocaleString()`方法.若数组中某一项为`null`或`undefined`,则上述3个方法和`join()`方法调用后,该项的位置为空字符串.
+````JS
+let colors = ["red", "blue", "green"];
+console.log(colors.toString()); // red,blue,green
+console.log(colors.valueOf());  // ["red", "blue", "green"]
+console.log(colors);            // ["red", "blue", "green"]
+````
+
+使用`join()`方法传入一个分隔的字符串(默认为`,`),返回数组中每个元素调用`toString()`的返回值并用所给值拼接:
+````JS
+let colors = ["red", "blue", "green"];
+console.log(colors.join("||")); // red||blue||green
+````
+
+### 栈方法与队列方法
+数组提供了`push()`(在数组末尾添加任意多个元素,返回数组长度)和`pop()`(弹出并返回最后一个元素)方法,以实现类似栈的行为.
+
+使用`push()`和`shift()`(弹出并返回第一个元素)方法,以实现类似队列的行为.
+
+`unshift()`方法允许在数组开头添加任意多个值,然后返回新的数组长度:
+````JS
+let colors = ["red", "blue", "green"];
+let count = colors.push("black", "yellow");
+console.log(count);             // 5
+console.log(colors.pop());      // yellow
+console.log(colors.shift());    // red
+count = colors.unshift("grey", "white");
+console.log(count);             // 5
+console.log(colors);            // ['grey', 'white', 'blue', 'green', 'black']
+````
+
+### 排序方法
+`reverse()`方法将数组元素逆序:
+````JS
+let nums = [2,5,1,7,3];
+nums.reverse();
+console.log(nums);  // [3, 7, 1, 5, 2]
+````
+
+`sort()`方法默认将数组元素**调用String()转型函数之后**,按照升序排列.
+````JS
+let values = [0,1,5,10,15];
+values.sort();
+console.log(values);
+````
+`sort()`方法可以接收一个比较函数,该情况下`sort()`不使用`String()`方法.比较函数中,传入两个参数,`负值`表示小于,`0`表示相等,`正值`表示大于.(也可以不遵循这种条件以实现降序排列)
+````JS
+function compare(value1, value2) {
+    // return value1 - value2;
+    if (value1 < value2) {
+        return -1;
+    } else if (value1 > value2) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+let values = [10,5,1,15,0];
+values.sort(compare);
+console.log(values);    // [0, 1, 5, 10, 15]
+````
+
+`reverse()`和`sort()`都返回调用它们的数组的引用.
+
+### 操作方法
+`concat()`方法创建一个原数组的拷贝(元素浅复制)并将实参拼接到其末尾(如果是数组),或添加到其末尾(如果不是数组):
+````JS
+let colors = ["red", "green", "blue"];
+let colors2 = colors.concat("yellow", ["black", "brown"]);
+console.log(colors);    // ["red", "green", "blue"]
+console.log(colors2);   // ["red", "green", "blue", "yellow", "black", "brown"]
+````
+详见[符号-Symbol.isConcatSpreadable](#symbolisconcatspreadable)
+
+`slice()`用于创建一个包含原有数组中一个或多个元素的新数组.该操作不影响原始数组.
+
+第一个参数是开始索引,第二个参数是结束索引(默认为`length`)(不包含).索引为负值表示从末尾开始计算.超出数组边界,零长度,方向相反索引返回空数组.
+````JS
+let colors = ["red", "green", "blue", "yellow", "black", "brown"];
+let colors2 = colors.slice(1, 4);
+console.log(colors2);   // ['green', 'blue', 'yellow']
+````
+
+`splice()`:
+- 删除.传入两个参数表示要删除的元素索引开始的位置和要删除的元素数量.
+- 替换.传入多于2个参数时,前两个参数表示要删除的元素索引开始的位置和要删除的元素数量.后面的参数表示要再删除处重新插入的元素.
+
+该方法返回一个数组,包含从数组中删除的元素.如果没有删除元素,则返回空数组.
+````JS
+let colors = ["red", "green", "blue"];
+let removed = colors.splice(0, 1);
+console.log(colors);    // ['green', 'blue']
+console.log(removed);   // ['red']
+
+removed = colors.splice(1, 0, "yellow", "orange");
+console.log(colors);    // ['green', 'yellow', 'orange', 'blue']
+console.log(removed);   // []
+
+removed = colors.splice(1, 1, "red", "purple");
+console.log(colors);    // ['green', 'red', 'purple', 'orange', 'blue']
+console.log(removed);   // ['yellow']
+````
+
+### 搜索和位置方法
+ES有两类搜索数组的方法:
+- 按严格相等搜索
+- 按断言函数搜索
+
+#### 严格相等
+`indexOf`接收两个参数:要查找的元素和可选的起始搜索位置.
+
+`indexOf`从前向后搜索,返回要查找的元素在数组中的位置.如果没找到则返回`-1`.
+
+`lastIndexOf()`接收两个参数:要查找的元素和可选的起始搜索位置.
+
+`lastIndexOf()`从后向前搜索,返回要查找的元素在数组中的位置.如果没找到则返回`-1`.
+
+`includes()`接收两个参数:要查找的元素和可选的起始搜索位置.
+
+`includes()`从前向后搜索,返回布尔值,表示是否至少找到一个与指定元素匹配的项.
+
+上面三个方法在比较每一项时,都会使用全等(`===`)比较.
+
+#### 断言比较
+断言函数接收3个参数:元素(数组中当前元素),索引(数组的当前索引)和数组本身.断言函数返回布尔值,表示是否匹配.
+
+`find()`和`findIndex()`方法使用了断言函数作为第一个参数.这两个方法都从数组的最小索引开始.`find()`返回第一个匹配的元素,`findIndex()`返回第一个匹配元素的索引.可选的第二个参数用于指定断言函数内部`this`的值.
+
+````JS
+const people = [10, 20, 50, 25, 80];
+console.log(people.find((element, index, array) => element >= 25 && element <= 35));    // 25
+````
+
+### 迭代方法
+ES为数组定义了5个迭代方法.每个方法接收两个参数:以每一项为参数运行的函数和可选的作为函数运行上下文的作用域对象(this).传给方法的函数接收3个参数:数组元素,元素索引和数组本身.
+
+- `every()`:对数组每一项都运行传入的函数,如果对每一项函数都返回`true`,则这个方法返回`true`.
+- `filter()`:对数组每一项都运行传入的函数,函数返回`true`的项会组成数组之后返回.
+- `forEach()`:对数组每一项都运行传入的函数,没有返回值.
+- `map()`:对数组每一项都运行传入的函数,返回由每次函数调用的结构构成的数组.
+- `some()`:对数组每一项都运行传入的函数,如果有一项函数返回`true`,则这个方法返回`true`.
+
+这些方法都不改变调用它们的数组.
+
+### 归并方法
+`reduce()`和`reduceRight()`方法会迭代数组的所有项,并在此基础上构建一个最终返回值.`reduce()`方法从数组第一项开始遍历到最后一项.`reduceRight()`从最后一项开始遍历至第一项.
+
+这两个方法接收两个参数:对每一项都会运行的归并函数,以及可选的以之为归并起点的初始值.
+
+归并函数接收4个参数:上一个归并值,当前项,当前索引,数组本身.函数的返回值会作为下一次调用该函数的第一个参数.若调用方法时没有传入第二个参数,则迭代从第二个元素开始,且将第一个元素作为调用归并函数的第一实参.否则,迭代从第一个元素开始,且将方法的第二实参作为归并函数的第一实参.
+
+## 定型数组
+为了让JavaScript提高向底层API(如WebGL)传输数据的效率(不是JS原生的`number`类型(底层是double),而是整型),产生了定型数组.
+
+### ArrayBuffer
+`ArrayBuffer`是所有定型数组及视图引用的基本单位,用于管理底层内存.
+
+`SharedArrayBuffer`是`ArrayBuffer`的变体,允许传递`SharedArrayBuffer`的引用而非像`ArrayBuffer`一样需要复制.
+
+构造函数`new ArrayBuffer(size)`在内存中分配`size`字节的空间:
+````JS
+const buf = new ArrayBuffer(16);    // 在内存中分配16字节的空间
+console.log(buf.byteLength);    // 16
+````
+`ArrayBuffer`一经创建就不能再调整大小.不过可以使用`slice()`复制其全部或部分到一个新实例中:
+````JS
+const buf1 = new ArrayBuffer(16);
+const buf2 = buf1.slice(4, 12);
+console.log(buf2.byteLength);   // 8
+````
+
+`ArrayBuffer`类似于C++的`::operator new(size)`,但也有不同之处,其行为包括:
+- `ArrayBuffer`分配失败时会抛出错误.
+- 后者可利用虚拟内存,因此只受可寻址系统内存限制.而`ArrayBuffer`分配的内存不能超过`Number.MAX_SAFE_INTEGER`(2^53-1)字节.
+- `ArrayBuffer`会将所有二进制位初始化为0.
+- `ArrayBuffer`可以被垃圾回收,不需要手动释放.
+- 为了对`ArrayBuffer`的引用读取或写入,就必须通过视图.
+
+**视图**将`ArrayBuffer`中的二进制数据解析为不同类型进行读写.
+
+### DataView
+`DataView`视图专为文件IO和网络IO设计,其API支持对缓冲数据的高度控制,但相比于其他类型的视图性能也差一些.`DataView`对缓冲的类型没有任何预设,也不能迭代.
+
+创建实例时需要指定对特定`ArrayBuffer`的引用.
+````JS
+const buf = new ArrayBuffer(16);
+// 第一个参数表示引用的ArrayBuffer
+const fullDataView = new DataView(buf);
+console.log(fullDataView.byteOffset);       // 0
+console.log(fullDataView.byteLength);       // 16
+console.log(fullDataView.buffer === buf);   // true
+// 第二个参数表示视图的字节偏移量,默认为0
+// 第三个参数表示限制视图的字节长度,默认为剩余缓冲
+const halfDataView = new DataView(buf, 0, 8);
+console.log(halfDataView.byteOffset);       // 0
+console.log(halfDataView.byteLength);       // 8
+console.log(halfDataView.buffer === buf);   // true
+````
+
+使用`byteOffset`属性获得视图相对于引用的`ArrayBuffer`的开始位置.使用`byteLength`属性获取视图可读写的缓冲区的字节数.使用`buffer`属性获取所引用的`ArrayBuffer`.
+
+#### ElementType
+由于`DataView`对存储在缓冲内的元素的类型没有预设,因此其强制要求开发者在读写时指定一个`ElementType`.
+
+ES支持的`ElementType`包含:
+- `ElemType`    `Byte`  `equivalent type in C++(LLP64)`     `range`
+-   `Int8`        1              signed char                -128~127
+-  `Uint8`        1             unsigned char                0~255
+-  `Int16`        2                 short                 -32768~32767
+-  `Uint16`       2             unsigned short              0~65535
+-  `Int32`        4                  int             -2147483648~2147483647
+-  `Uint32`       4                unsigned               0~4294967295
+- `Float32`       4                 float               -3.4e+38~+3.4e+38
+- `Float64`       8                 double             -1.7e+308~+1.7e+308
+
+使用`get`和`set`方法并与上述类型组合,以实现对`DataView`的读写.
+
+`set`族方法的第一个参数为字节位移量(考虑元素类型本身字节),第二个参数为写入值,可选的第三个参数为布尔值,用于控制大小端字节序.
+
+`get`族方法的第一个参数为字节位移量(考虑元素类型本身字节),可选的第二个参数为布尔值,用于控制大小端字节序.
+
+例如:
+````JS
+const buf = new ArrayBuffer(2);
+const view = new DataView(buf);
+// 获取后8个字节
+console.log(view.getInt8(1));   // 0
+// 获取整个缓冲(16字节)
+console.log(view.getInt16(0));  // 0
+view.setUint8(1, 255);  // 0x00FF
+// 大端字节序读取16字节
+console.log(view.getInt16(0));  // 255
+````
+
+#### 字节序
+`字节序`指的是计算系统维护的一种字节顺序的约定.`DataView`支持两种约定:`大端字节序`和`小端字节序`.大端字节序将高位放在低地址处.小端字节序将低位放在低地址处.
+
+`DataView`不遵循原生系统的大小端存储规则,而约定:`get`和`set`族方法允许传入一个布尔值(分别为第二个参数和第三个参数)用于控制大小端字节序的读写.默认值为`false`,即大端字节序.传入`true`即可启用小端字节序.
+````JS
+const buf = new ArrayBuffer(2);
+const view = new DataView(buf);
+view.setUint8(0, 0x80);
+view.setUint8(1, 0x01);
+// 0b1000'0000'0000'0001
+console.log(view.getUint16(0));         // 32769  0x8001
+console.log(view.getUint16(0, true));   // 384    0x0180
+
+view.setUint16(0, 0x0004);
+// 0x  0    0    0    4
+// 0b 0000 0000 0000 0100
+view.setUint16(0, 0x0002, true);
+// 0x  0    2    0    0
+// 0b 0000 0010 0000 0000
+````
+
+#### 其他
+`DataView`尝试读写超出或部分超出缓冲区范围的内存时会抛出`RangeError`异常.
+
+对于写入缓冲区内的值,会尽可能转换为适当的类型,后备为`0`.如果无法转换,则抛出错误`TypeError`:
+````JS
+const buf = new ArrayBuffer(1);
+const view = new DataView(buf);
+
+view.setInt8(0, 1.5);   // 1
+view.setInt8(0, [4]);   // 4
+view.setInt8(0, 'f');   // 0
+view.setInt8(0, Symbol());  // TypeError
+````
+
+### 定型数组
+定型数组也是一种视图,与`DataView`相近,但是它特定于一种`ElementType`且**遵循系统原生的字节序**.定型数组提供了适用面更广的API和更高的性能.JS引擎能够优化其算数运算,按位运算和其他对定型数组的常见操作,因此使用它们速度极快.
+
+定型数组继承于`TypedArray`.
+
+创建定型数组的方法包括读取已有缓冲,填充可迭代结构,填充(基于任意类型的)定型数组,`from()`静态方法和`of()`静态方法:
+````JS
+const buf = new ArrayBuffer(12);
+const ints = new Int32Array(buf, 4, 2); // 第二和第三个参数分别为传入字节偏移量和元素数量(不是字节,而是可容纳元素数)
+console.log(ints.length);       // 2
+console.log(ints.byteLength);   // 8
+console.log(ints.byteOffset);   // 4
+console.log(ints.buffer === buf);   // true
+
+const ints2 = new Int32Array(6);    // 会自动创建一个24字节的缓冲
+console.log(ints2.buffer instanceof ArrayBuffer);   // true
+
+const ints3 = new Int32Array([2,4,6,8]);    // 会自动创建一个16字节的缓冲
+console.log(ints3[2]);  // 6
+const ints4 = new Int16Array(ints3);    // 分配8字节的缓冲并将ints3的数据复制给ints4
+const ints5 = Int16Array.from([3,5,7,9]);
+const floats = Float32Array.of(3.14, 2.718, 1.618);
+````
+
+`length`属性返回可容纳元素数,`byteLength`属性返回可容纳字节数,`byteOffset`属性返回可读写的缓冲区的字节数,`buffer`属性返回引用的缓冲.`BYTES_PER_ELEMENT`静态属性返回某类型数组中每个元素占用的字节数.
+
+#### 定型数组行为
+定型数组的行为类似普通数组,其支持如下操作符,方法和属性:
+- `[]`
+- `copyWithin()`
+- `entries()`
+- `every()`
+- `fill()`
+- `filter()`
+- `find()`
+- `findIndex()`
+- `forEach()`
+- `indexOf()`
+- `join()`
+- `keys()`
+- `lastIndexOf()`
+- `length`
+- `map()`
+- `reduce()`
+- `reduceRight()`
+- `reverse()`
+- `slice()`
+- `some()`
+- `sort()`
+- `toLocaleString()`
+- `toString()`
+- `values()`
+
+其中,返回新数组的方法也会返回包含同样元素类型的新定型数组:
+````JS
+const ints = new Int16Array([1,2,3]);
+const doubleInts = ints.map(x => 2*x);
+console.log(doubleInts instanceof Int16Array);  // true
+````
+
+定型数组拥有`Symbol.iterator`符号属性:
+````JS
+const ints = new Int16Array([1,2,3]);
+for (const num of ints) {
+    console.log(num);
+}
+// 1
+// 2
+// 3
+````
+
+#### 合并,复制和修改定型数组
+定型数组使用数组缓冲来存储数据,因此无法调整大小.
+
+以下方法不适用于定型数组:
+- `concat()`
+- `pop()`
+- `push()`
+- `shift()`
+- `splice()`
+- `unshift()`
+
+使用`set()`方法将提供的数组或定型数组中的值复制到当前定型数组的指定索引位置:
+````JS
+const container = new Int16Array(8);
+container.set(Int8Array.of(1,2,3,4));
+console.log(container); // [1, 2, 3, 4, 0, 0, 0, 0]
+container.set([5,6,7,8], 4);
+console.log(container); // [1, 2, 3, 4, 5, 6, 7, 8]
+// 超过或部分超过索引范围会抛出错误
+container.set([5,6,7,8], 7);    // RangeError
+````
+
+`subarray()`基于原始定型数组中复制的值返回一个新的定型数组.复制时开始索引和结束索引是可选的,左闭右开:
+````JS
+const source = Int16Array.of(2,4,6,8);
+const fullCopy = source.subarray();
+console.log(fullCopy);  // [2, 4, 6, 8]
+const partialCopy = source.subarray(1, 3);
+console.log(partialCopy);   // [4, 6]
+````
+
+定型数组没有原生的拼接能力,但可以手动构建:
+````JS
+// 第一个参数是应该返回的数组类型
+// 其余参数是应该拼接在一起的定型数组
+function typedArrayConcat(typedArrayConstructor, ...typedArrays) {
+    const numElements = typedArrays.reduce((x, y) => (x.length || x) + y.length);
+    const resultArray = new typedArrayConstructor(numElements);
+    let currentOffset = 0;
+    typedArray.map(x => {
+        resultArray.set(x, currentOffset);
+        currentOffset += x.length;
+    });
+    return resultArray;
+}
+const concatArray = typedArrayConcat(Int32Array,
+                                     Int8Array.of(1,2,3),
+                                     Int16Array.of(4,5,6),
+                                     Float32Array.of(7,8,9));
+console.log(concatArray);   // [1, 2, 3, 4, 5, 6, 7, 8, 9]
+console.log(concatArray instanceof Int32Array); // true
+````
+
+#### 上溢和下溢
+定型数组会有类似于C语言数组中元素的上溢和下溢行为:
+````JS
+const ints = new Int8Array(2);
+ints[1] = 255;
+console.log(ints);  // [0, -1]
+````
+
+`Uint8ClampedArray`不允许任何方向溢出.超出最大值255的值会向下舍入为255,而小于最小值0的值会被向上舍入为0.
+
+> `Uint8ClampedArray`完全是HTML5`canvas`元素的历史留存.除非真的做跟`canvas`相关的开发,否则不要使用它.
+> <p style="text-align: right"> -- Brendan Eich</p>
+
+## Map
+`Object`也可以作为键值对的存储容器,但`Map`的特性实现了真正的键值存储机制.
+
+### 基本API
+默认构造可以创建一个空映射:
+````JS
+const m = new Map();
+````
+传入可迭代对象,并将包含键值对的数组作为元素可以在构造时将可迭代对象中的每个键值对依次插入到新映射中:
+````JS
+const m1 = new Map([
+    ["key1", "value1"],
+    ["key2", "value2"],
+    ["key3", "value3"]
+]);
+console.log(m1.size);   // 3
+const m2 = new Map({
+    [Symbol.iterator]: function*() {
+        yield ["key1", "value1"],
+        yield ["key2", "value2"],
+        yield ["key3", "value3"],
+    }
+});
+console.log(m2.size);   // 3
+// 若可迭代元素内的包含键值对的数组是空,仍然会被解析为undefined: undefined
+const m3 = new Map([ [] ]);
+console.log(m3.has(undefined)); // true
+````
+
+- `set()`方法可以添加或更新一个指定的键值对.
+- `get()`方法可以获取对应键的值(若为对象,则为其引用).如果无所给键,返回`undefined`.
+- `has()`方法查询是否存在指定键.
+- `delete()`方法删除指定键(与值).
+- `clear()`方法删除所有键值对.
+
+````JS
+const m = new Map();
+console.log(m.has("fn"));   // false
+console.log(m.get("fn"));   // undefined
+console.log(m.size);        // 0
+m.set("fn", "aaa").
+  set("ln", "bbb")          // set()方法返回实例本身,因此支持这种写法
+console.log(m.has("fn"));   // true
+console.log(m.get("fn"));   // aaa
+console.log(m.size);        // 2
+m.delete("fn");
+console.log(m.has("fn"));   // false
+console.log(m.has("ln"));   // true
+console.log(m.size);        // 1
+m.clear();
+console.log(m.size);        // 0
+````
+
+`Object`只能使用数值,字符串或符号作为键,但`Map`可以使用任何JS数据类型作为键.`Map`内部使用`SameValueZero`比较操作(ES内部定义,语言中不能使用),大体相当于使用严格对象相等的标准检查键的匹配性.映射的值也没有限制.
+
+集合的键若是对象,则其依然是引用,外部对其的修改并不会影响键值对的映射关系:
+````JS
+const m = new Map();
+const objKey = {},
+      objVal = {},
+      arrKey = [],
+      arrVal = [];
+m.set(objKey, objVal);
+m.set(arrKey, arrVal);
+objKey.foo = "foo";
+objVal.bar = "bar";
+arrKey.push("foo");
+arrVal.push("bar");
+console.log(m.get(objKey)); // {bar: "bar"}
+console.log(m.get(arrKey)); // ["bar"]
+console.log(m.has([]));     // false
+console.log(m.has(["foo"]));// false
+````
+
+`SameValueZero`中`NaN`和`NaN`,`+0`和`-0`被认为是相等的.
+
+详见[MDN-JavaScript 中的相等性判断](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Equality_comparisons_and_sameness)
+
+### 顺序与迭代
+`Map`实例会维护键值对的插入顺序,因此可以根据插入顺序执行迭代操作.
+
+使用`Symbol.iterator`属性或者`entries()`方法(前者引用后者)可以获取`Map`的迭代器,迭代器会以插入的顺序输出`[key, value]`形式的数组:
+````JS
+const m = new Map([
+    ["key1", "val1"],
+    ["key2", "val2"],
+    ["key3", "val3"]
+]);
+console.log(m.entries === m[Symbol.iterator]);  // true
+for (let pair of m.entries()) {
+    console.log(pair);
+}
+// [key1, val1]
+// [key2, val2]
+// [key3, val3]
+````
+
+扩展操作符`...`能把`Map`转换为数组:
+````JS
+const m = new Map([
+    ["key1", "val1"],
+    ["key2", "val2"],
+    ["key3", "val3"]
+]);
+console.log([...m]);    // [[key1, val1], [key2, val2], [key3, val3]]
+````
+
+`forEach(callback, opt_thisArg)`的回调函数接收两个参数`val`和`key`(`forEach`可选的第二参数为回调函数的`this`值):
+````JS
+const m = new Map([
+    ["key1", "val1"],
+    ["key2", "val2"],
+    ["key3", "val3"]
+]);
+m.forEach((val, key) => console.log(`${key} -> ${val}`));
+// key1 -> val1
+// key2 -> val2
+// key3 -> val3
+````
+
+`keys()`和`values()`分别返回以插入顺序生成键和值的迭代器.
+
+键和值在迭代器遍历时是可以修改的,但无法将键绑定为其他对象,只能修改其属性.
+
+### 选择Object还是Map
+1. 内存占用: `Object`和`Map`对内存的分配取决于实现,但`Map`所占内存小于`Object`.
+2. 插入性能: `Map`一般会比`Object`稍快一些.
+3. 查找速度: 大型的`Object`和`Map`中查找键值对的性能差异极小,但如果只包含少量键值对,则`Object`有时速度更快,因为浏览器可以对作为数组使用的`Object`进行布局优化,而`Map`不行.
+4. 删除性能: `Map`的`delete()`操作远快于对`Object`属性的`delete`.
+
+## WeakMap
+`WeakMap`的API是`Map`的子集.
+
+### 基本API
+默认构造创建一个空的`WeakMap`:
+````JS
+const wm = new WeakMap();
+````
+弱映射中的键只能是`Object`或者继承自`Object`的类型,尝试使用非对象设置键会抛出`TypeError`.值的类型没有限制.
+
+类似`Map`,传入可迭代对象,并将包含键值对的数组作为元素可以在构造时将可迭代对象中的每个键值对依次插入到新实例中:
+````JS
+const key1 = {id: 1},
+      key2 = {id: 2},
+      key3 = {id: 3};
+const wm1 = new WeakMap([
+    [key1, "val1"],
+    [key2, "val2"],
+    [key3, "val3"]
+]);
+console.log(wm1.get(key1)); // val1
+console.log(wm1.get(key2)); // val2
+console.log(wm1.get(key3)); // val3
+// 初始化是全有或全无的操作,只要有一个键无效就会抛出错误,导致整个初始化失败
+const wm2 = new WeakMap([
+    [key1, "val1"],
+    ["BADKEY", "val2"],
+    [key3, "val3"]
+]);
+// TypeError: Invalid value used as WeakMap key
+typeof wm2; // ReferenceError: wm2 is not defined
+const stringKey = new String("key1");   // 原始值可以先包装成对象再用作键
+const wm3 = new WeakMap([
+    [stringKey, "val"]
+]);
+console.log(wm3.get(stringKey));
+````
+
+- `set()`方法可以添加或更新一个指定的键值对.
+- `get()`方法可以获取对应键的值(若为对象,则为其引用).如果无所给键,返回`undefined`.
+- `has()`方法查询是否存在指定键.
+- `delete()`方法删除指定键(与值).
+
+### 弱键
+所谓弱键,描述的是引用而不拥有,即虽然键引用了一个对象,但不会影响其垃圾回收.值则是引用且拥有.
+
+对于弱键,一旦失去其它对对象的引用,则该键会被垃圾回收:
+````JS
+const wm = new WeakMap();
+wm.set({}, "val");  // {}会被垃圾回收
+````
+
+### 不可迭代键
+`WeakMap`无法迭代其键值对.
+
+## Set
+Set对象允许你存储任何类型的**唯一值**.
+
+### 基本API
+默认构造可以创建一个空集合:
+````JS
+const s = new Set();
+````
+要在创建的同时初始化实例,可以给Set构造函数传入一个可迭代对象,其中包含插入到新集合实例中的元素:
+````JS
+const s1 = new Set(["val1", "val2", "val3"]);
+console.log(s1.size);   // 3
+const s2 = new Set({
+    [Symbol.iterator]: function*() {
+        yield "val1";
+        yield "val2";
+        yield "val3";
+    }
+});
+console.log(s2.size);   // 3
+````
+
+- `add()`方法用于插入一个新元素.
+- `has()`方法用于查询是否存在某一元素.
+- `size`属性取得元素数量.
+- `delete()`删除指定元素.成功删除返回`true`,否则返回`false`.
+- `clear()`删除所有元素.
+
+````JS
+const s = new Set().add("ccc");     // 构造函数返回对象本身,add()也返回集合本身,因此可以这么做
+console.log(s.has("aaa"));  // false
+console.log(s.size);        // 1
+s.add("aaa").
+  add("bbb");   // add()返回集合本身,所有可以将多个添加操作连缀起来
+console.log(s.has("aaa"));  // true
+console.log(s.size);        // 3
+s.delete("aaa");
+console.log(s.has("aaa"));  // false
+console.log(s.has("bbb"));  // true
+console.log(s.size);        // 2
+s.clear();
+console.log(s.size);        // 0
+````
+
+`Set`可以包含任何JS数据类型作为值.集合也使用`SameValueZero`操作(ES内部定义,无法在语言中使用).
+
+若元素为对象,则其在`Set`持有其引用.外部的修改能影响其内部,但不会影响对其的查找.
+
+### 顺序与迭代
+`Set`会维护值插入时的顺序,因此按插入顺序迭代.
+
+可以使用`value()`或`keys()`或`Symbol.iterator`(其引用`values()`)来获取迭代器:
+````JS
+const s = new Set(["val1", "val2", "val3"]);
+console.log(s.value === s[Symbol.iterator]);    // true
+console.log(s.keys === s[Symbol.iterator]);     // true
+for (let value of s.values()) {
+    console.log(value);
+}
+// val1
+// val2
+// val3
+````
+
+可以对集合使用`...`(扩展操作符),把集合转换为数组:
+````JS
+const s = new Set(["val1", "val2", "val3"]);
+console.log([...s]);    // ["val1", "val2", "val3"]
+````
+
+集合的`entries()`方法返回一个迭代器,可以按照插入顺序返回包含键值对的数组,对于集合来说,键和值相同.
+````JS
+const s = new Set(["val1", "val2", "val3"]);
+for (let pair of s.entries()) {
+    console.log(pair);
+}
+// ["val1", "val1"]
+// ["val2", "val2"]
+// ["val3", "val3"]
+````
+
+`forEach(callback, opt_thisArg)`的回调函数接收两个参数`val`和`dupVal`,这两个参数值相同(`forEach`可选的第二参数为回调函数的`this`值):
+````JS
+const s = new Set(["val1", "val2", "val3"]);
+s.forEach((val, dupVal) => console.log(`${val} -> ${dupVal}`));
+// val1 -> val1
+// val2 -> val2
+// val3 -> val3
+````
+
+### 自定义集合操作
+`Set`的很多与集合相关的操作需要手动去实现,实现时,要考虑到:
+- 某些`Set`操作是可交换的,这些方法最好能支持处理任意多个集合实例.
+- `Set`保留插入顺序,所有方法返回的集合必须保证顺序.
+- 尽可能高效地使用内存.扩展操作符语法简洁,但应尽可能避免集合和数组间的相互转换能够节省对象初始化成本.
+- 不要修改已有的集合实例.`union(a,b)`或`a.union(b)`应该返回包含结果的新集合实例.
+- 在定义集合相关的函数库时,可以考虑定义为集合的静态方法.
+
+````JS
+class XSet extends Set {
+    union(...sets) {
+        return XSet.union(this, ...sets);
+    }
+    intersection(...sets) {
+        return XSet.intersection(this, ...sets);
+    }
+    difference(set) {
+        return XSet.difference(this, set);
+    }
+    symmetricDifference(set) {
+        return XSet.symmetricDifference(this, set);
+    }
+    cartesianProduct(set) {
+        return XSet.cartesianProduct(this, set);
+    }
+    powerSet() {
+        return XSet.powerSet(this);
+    }
+    // 并集
+    static union(a, ...bSets) {
+        const unionSet = new XSet(a);
+        for (const b of bSets) {
+            for (const b of bSets) {
+                for (const bValue of b) {
+                    unionSet.add(bValue);
+                }
+            }
+        }
+    }
+    // 交集
+    static intersection(a, ...bSets) {
+        const intersectionSet = new XSet(a);
+        for (const aValue of intersectionSet) {
+            for (const b of bSets) {
+                if (!b.has(aValue)) {
+                    intersectionSet.delete(aValue);
+                }
+            }
+        }
+        return intersectionSet;
+    }
+    // 差集
+    static difference(a, b) {
+        const differenceSet = new XSet(a);
+        for (const bValue of b) {
+            if (a.has(bValue)) {
+                differenceSet.delete(bValue);
+            }
+        }
+        return differenceSet;
+    }
+    // 对称差
+    static symmetricDifference(a, b) {
+        return a.union(b).difference(a.intersection(b));
+    }
+    // 笛卡尔积
+    static cartesianProduct(a, b) {
+        const cartesianProductSet = new XSet();
+        for (const aValue of a) {
+            for (const bValue of b) {
+                cartesianProductSet.add([aValue, bValue]);
+            }
+        }
+        return cartesianProductSet;
+    }
+    // 幂集
+    static powerSet(a) {
+        const powerSet = new XSet().add(new XSet());
+        for (const aValue of a) {
+            for (const set of new XSet(powerSet)) {
+                powerSet.add(new XSet(set).add(aValue));
+            }
+        }
+        return powerSet;
+    }
+}
+````
+
+## WeakSet
+`WeakSet`的API是`Set`的子集.
+
+### 基本API
+默认构造创建一个空的`WeakSet`:
+````JS
+const ws = new WeakSet();
+````
+
+弱集合只能存储`Object`或者继承自`Object`的类型,尝试使用非对象值会抛出`TypeError`.
+
+要在初始化时填充弱集合,则给构造函数传入一个可迭代对象:
+````JS
+const val1 = {id: 1},
+      val2 = {id: 2},
+      val3 = {id: 3};
+const ws1 = new WeakSet([val1, val2, val3]);
+console.log(ws1.has(val1)); // true
+console.log(ws1.has(val2)); // true
+console.log(ws1.has(val3)); // true
+// 初始化只要有一个值无效就会抛出错误,整个初始化无效
+const ws2 = new WeakSet([val1, "BADVAL", val3]);    // TypeError
+typeof ws2; // ReferenceError
+````
+
+- `add()`方法用于插入一个新元素.
+- `has()`方法用于查询是否存在某一元素.
+- `delete()`删除指定元素.成功删除返回`true`,否则返回`false`.
+
+### 弱值
+`WeakSet`的弱值,描述的是引用而不拥有,即虽然值引用了一个对象,但不会影响其垃圾回收.一旦失去其他引用该值的引用,则会执行垃圾回收.
+
+### 不可迭代键
+`WeakSet`的值在任何时候都可能被销毁,因此无法迭代其值.
+
+## 迭代与扩展操作
+`Array`,`Map`,`Set`,`定型数组`都支持静态方法`of()`和`from()`来创建.
 
 # 迭代器与生成器
+## 理解迭代
+
 
 # 对象,类,面向对象编程
 ES中对象是一组属性无序的集合.对象的每个属性或方法都由一个名称来标识,名称映射到一个值.因此,可以把ES对象当作一个`unordered_map`.
