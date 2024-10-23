@@ -14,3 +14,5 @@
 如果你发现了任何错误,可以PR.
 
 所有markdown都写于`vscode`深色模式并使用`Markdown All in One`插件,如果看起来颜色不清楚,可以把那些markdown文件开头的`<style>`删掉.
+
+另外,在github上直接查看笔记可能无法应用`<style>`等HTML标签,但这并不影响阅读.
