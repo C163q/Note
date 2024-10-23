@@ -1,14 +1,13 @@
-<head>
-    <title>C++ Note Collection 1</title>
-    <style type="text/css">
-        body {
-            font-family: "cascadia code", 幼圆, 宋体;
-        }
-        code {
-            color: burlywood;
-        }
-    </style>
-</head>
+<title>C++ Note Collection 1</title>
+<style type="text/css">
+    body {
+        font-family: "cascadia code", 幼圆, 宋体;
+    }
+    code {
+        color: burlywood;
+    }
+</style>
+
 
 # 目录
 - [目录](#目录)
@@ -76,6 +75,9 @@
 	- [Atomic](#atomic)
 		- [Atomic的C风格接口](#atomic的c风格接口)
 		- [低层接口](#低层接口)
+- [模板与SFINAE](#模板与sfinae)
+	- [只要不调用就不会实例化](#只要不调用就不会实例化)
+	- [SFINAE](#sfinae)
 - [术语](#术语)
 	- [trivial（平凡的）](#trivial平凡的)
 	- [未定义行为(ud)](#未定义行为ud)
@@ -2129,7 +2131,62 @@ if (std::atomic_load(&ab)) { ... }
 
 `atomic_thread_fence()`和`atomic_thread_fence()`非成员函数能够控制内存访问重安排的界限.
 
+# 模板与SFINAE
+## 只要不调用就不会实例化
+看一下以下例子:
+````C++
+class A {
+public:
+	A() {}
+	A(const A&) = delete;
+	A(A&&) = default;
+	A& operator=(const A&) = delete;
+	A& operator=(A&&) = default;
+};
 
+template<typename T>
+class B {
+	T value;
+public:
+	B() {}
+	void func1() {
+		T new_value = value;
+	}
+	void func2() {
+		T new_value = std::move(value);
+	}
+};
+// B<A>
+````
+上述例子中,`A`的复制构造和复制赋值都是被删除的方法,如果实例化`B<A>`,则使用`func1()`是绝对不行的,因为这涉及到了`A`的赋值构造.而使用`func2()`是可行的.
+
+对于:
+````C++
+int main() {
+	B<A> v;
+	v.func1();
+}
+````
+会显示报错:
+```
+C2280: “A::A(const A &)”: 尝试引用已删除的函数	
+```
+
+而对于:
+````C++
+int main() {
+	B<A> v;
+	v.func2();
+}
+````
+则能够编译成功.
+
+这表明,只要不调用`func1()`,就不会实例化该方法,也就不会产生编译错误.
+
+## SFINAE
+“替换失败不是错误” (Substitution Failure Is Not An Error)
+
+// ---------[TODO]-----------
 
 # 术语
 ## trivial（平凡的）

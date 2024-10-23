@@ -1,14 +1,13 @@
-<head>
-    <title>This is a HTML note.</title>
-    <style>
-        body {
-            font-family: "cascadia code", 幼圆;
-        }
-        code {
-            color: burlywood;
-        }
-    </style>
-</head>
+<title>This is a HTML note.</title>
+<style>
+    body {
+        font-family: "cascadia code", 幼圆;
+    }
+    code {
+        color: burlywood;
+    }
+</style>
+
 
 # 目录
 - [目录](#目录)

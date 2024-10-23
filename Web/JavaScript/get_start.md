@@ -1,20 +1,19 @@
-<head>
-    <title>This is a JavaScript note.</title>
-    <style type="text/css">
-        body {
-            font-family: "cascadia code", 幼圆, 宋体;
-        }
-        code {
-            color: burlywood;
-        }
-        .red_font {
-            color: crimson;
-        }
-        .yellow_font {
-            color: orange;
-        }
-    </style>
-</head>
+<title>This is a JavaScript note.</title>
+<style type="text/css">
+    body {
+        font-family: "cascadia code", 幼圆, 宋体;
+    }
+    code {
+        color: burlywood;
+    }
+    .red_font {
+        color: crimson;
+    }
+    .yellow_font {
+        color: orange;
+    }
+</style>
+
 
 # 目录
 - [目录](#目录)
@@ -438,6 +437,12 @@
       - [串行执行期约](#串行执行期约)
       - [栈追踪与内存管理](#栈追踪与内存管理)
 - [BOM](#bom-1)
+  - [window对象](#window对象)
+    - [Global作用域](#global作用域)
+    - [窗口关系](#窗口关系)
+    - [窗口位置与像素比](#窗口位置与像素比)
+      - [像素比](#像素比)
+    - [窗口大小](#窗口大小)
 
 # 认识JavaScript
 `JavaScript`包含: 核心(ECMAScript), 文档对象模型(DOM), 浏览器对象模型(BOM).
@@ -9534,4 +9539,79 @@ foo();
 `await in foo`表明此时`foo()`被挂起了,并没有退出.上述调用栈表明异步函数并不会保留完整的调用栈,因而不会带来额外的性能消耗.
 
 # BOM
+ES把浏览器对象模型(BOM)描述为JS的核心.BOM的发展缺乏规范,最终,浏览器实现之间共通的部分成为了事实标准,为Web开发提供了浏览器之间互操作的基础.HTML5规范中有一部分涵盖了BOM的主要内容.
+
+## window对象
+BOM的核心是`window`对象,表示浏览器的实例.`window`对象在浏览器中有两重身份,一个是ES中的Global对象,另一个就是浏览器窗口的JS接口.这意味着在全局范围内定义的对象,(用`var`定义的)变量和函数都以`window`作为其`Global`对象.
+
+### Global作用域
+`window`对象被复用为ES的Global对象,所以通过`var`声明的所有全局变量和函数都会变成`window`对象的属性和方法:
+````JS
+var age = 29;
+var sayAge = () => console.log(this.age);
+console.log(window.age);    // 29
+sayAge();   // 29
+window.sayAge();    // 29
+````
+
+使用`let`或`const`替代`var`,则不会把变量添加给全局对象:
+````JS
+let age = 29;
+const sayAge = () => console.log(this.age);
+console.log(window.age);    // undefined
+sayAge();   // undefined
+window.sayAge();    // TypeError
+````
+
+很多对象都暴露在全局作用域中,例如`location`和`navigator`,因而它们也是`window`对象的属性.
+
+### 窗口关系
+所谓窗口包含浏览器窗口(最外层的`window`对象)以及窗格`<frame>`等.
+
+(以下的`window`表示任意窗口)
+
+`window.top`属性始终指向最上层(最外层)窗口,即浏览器窗口本身.`window.parent`则始终指向当前窗口的父窗口,如果没有父窗口,则其`parent`属性为自身引用.`window.self`属性始终指向自身.
+
+### 窗口位置与像素比
+`screenLeft`和`screenTop`分别表示窗口相对于屏幕左侧和顶部的位置,返回值的单位是CSS像素.
+
+`moveTo()`和`moveBy()`方法移动窗口.这两个方法都接收两个参数,其中`moveTo()`接收要移动到的新位置的绝对坐标`x`和`y`;`moveBy()`则接收相对当前位置在两个方向上移动的像素数:
+````JS
+// 把窗口移动到左上角
+window.moveTo(0, 0);
+// 把窗口向下移动100像素
+window.moveBy(0, 100);
+````
+
+#### 像素比
+一CSS像素约为1/96英寸.定义为屏幕距离人眼一臂长时,0.0213°在屏幕上的长度为一CSS像素.相同分辨率的不同设备可能会有不同的CSS像素.物理像素与CSS像素的比率由`window.devicePixelRatio`属性提供.例如物理分辨率为`1920×1080`,CSS像素分辨率为`640×320`的设备的`window.devicePixelRatio`为`3`.
+
+### 窗口大小
+布局视口:浏览器中不包含框架的页面部分.除非调整浏览器整体大小或者修改框架布局,否则它是不变的.
+
+视觉视口:浏览器中可见的部分,相对于布局视口.当使用双指缩放,或键盘在手机上弹出的时候,或者之前隐藏的地址栏变得可见的时候,视觉视口缩小了,但是布局视口却保持不变.
+
+`outerWidth`,`outerHeight`返回浏览器窗口自身的大小,不论是在哪个窗口上使用该属性.
+
+`innerWidth`,`innerHeight`返回浏览器窗口中页面视口的大小(不包括浏览器边框和工具栏).(这两个属性通常被认为是布局视口的大小)
+
+`document.documentElement.clientWidth`和`document.documentElement.clientHeight`返回页面视口的宽度和高度.
+
+由于兼容性问题,浏览器窗口自身的精确尺寸不好确定,但可以确定页面视口的大小:
+````JS
+let pageWidth = window.innerWidth,
+    pageHeight = window.innerHeight;
+if (typeof pageWidth != "number") {
+    if (document.compatMode == "CSS1Compat") {
+        pageWidth = document.documentElement.clientWidth;
+        pageHeight = document.documentElement.clientHeight;
+    } else {
+        pageWidth = document.body.clientWidth;
+        pageHeight = document.body.clientHeight;
+    }
+}
+````
+
+而在移动设备上,不同浏览器确定布局视口和视觉视口会有所差异.
+
 
