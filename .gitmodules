@@ -2,3 +2,6 @@
 	path = C_Cpp/Modern_Cpp/modern-cpp-features
 	url = https://github.com/AnthonyCalandra/modern-cpp-features
 
+[submodule "Web/CSS/collection/normalize"]
+	path = Web/CSS/collection/normalize
+	url = https://github.com/necolas/normalize.css
