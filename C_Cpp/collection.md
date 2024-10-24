@@ -78,9 +78,12 @@
 - [模板与SFINAE](#模板与sfinae)
 	- [只要不调用就不会实例化](#只要不调用就不会实例化)
 	- [SFINAE](#sfinae)
+- [书写更好的C++代码](#书写更好的c代码)
+	- [不要抛弃按值传递](#不要抛弃按值传递)
 - [术语](#术语)
 	- [trivial（平凡的）](#trivial平凡的)
 	- [未定义行为(ud)](#未定义行为ud)
+	- [对象切割(对象切片)](#对象切割对象切片)
 
 
 # 底层内存管理
@@ -2188,6 +2191,131 @@ int main() {
 
 // ---------[TODO]-----------
 
+
+# 书写更好的C++代码
+## 不要抛弃按值传递
+如果满足以下条件,*考虑(非必需)*使用按值传递而非按引用传递,即使是复杂的类:
+- 对象可复制构造
+- 移动构造的成本低且移动后的对象析构成本低
+- 对于左值对象的复制是不可避免的或者对右值对象进行复制或移动操作
+
+例如:
+````C++
+class B {
+public: 
+	B() noexcept { std::cout << "default construct" << std::endl; }
+	B(int) noexcept { std::cout << "int construct" << std::endl; }
+	~B() noexcept { std::cout << "destruct" << std::endl; }
+	B(B&&) noexcept { std::cout << "move" << std::endl; }
+	B(const B&) noexcept { std::cout << "copy" << std::endl; }
+	B& operator=(const B&) noexcept { std::cout << "copy assign" << std::endl; }
+	B& operator=(B&&) noexcept { std::cout << "move assign" << std::endl; }
+};
+std::ostream& operator<<(std::ostream& os, const B&) {
+	std::cout << "B";
+	return os;
+}
+
+std::vector<B> vec;
+
+void func1(B b) {
+	std::cout << "func1" << std::endl;
+	vec.push_back(std::move(b));
+}
+void func2(const B& b) {
+	std::cout << "func2" << std::endl;
+	vec.push_back(b);
+}
+void func3(B&& b) {
+	std::cout << "func3" << std::endl;
+	vec.push_back(std::move(b));
+}
+
+int main() {
+	vec.reserve(4);
+	B v;
+	std::cout << "---------" << std::endl;
+	func1(B());
+	std::cout << "---------" << std::endl;
+	func1(v);
+	std::cout << "---------" << std::endl;
+	func2(v);
+	std::cout << "---------" << std::endl;
+	func3(B());
+	std::cout << "---------" << std::endl;
+	for (const B& elem : vec) {
+		std::cout << elem << ' ';
+	}
+	std::cout << std::endl;
+}
+````
+在`debug`和`release`模式下都输出:
+```
+default construct
+---------
+default construct
+func1
+move
+destruct
+---------
+copy
+func1
+move
+destruct
+---------
+func2
+copy
+---------
+default construct
+func3
+move
+destruct
+---------
+B B B B
+destruct
+destruct
+destruct
+destruct
+destruct
+```
+
+**分析:**
+
+对于`func1`,按值传递临时变量并非是创建一个临时变量再进行移动,而是直接在函数内部创建,因此相比`func3`**不会**有额外的移动的成本.对于按值传递左值,相比`func2`会多出一个移动和析构的过程.
+
+由于移动成本低且移动后的对象析构的成本低,因此可以使用`func1`来代替`func2`和`func3`以生成更少量的目标代码.
+
+**注意:**使用按值传递表明不能使用按引用传递的继承多态性,因此含虚函数的基类不适合(不应当)使用按值传递的方法.例如:  
+````C++
+class Base {
+public:
+	virtual void func() const noexcept { std::cout << "Base" << std::endl; }
+};
+
+class Derived : public Base {
+public:
+	virtual void func() const noexcept { std::cout << "Derived" << std::endl; }
+};
+
+void func1(Base b) {	// 不要这样做!!!!!!!!!!!!!!!!!!!
+	b.func();
+}
+void func2(const Base& b) {
+	b.func();
+}
+void func3(Base&& b) {
+	b.func();
+}
+
+int main() {
+	Derived d;
+	func1(Derived());	// Base
+	func1(d);			// Base
+	func2(d);			// Derived
+	func3(Derived());	// Derived
+}
+````
+
 # 术语
 ## trivial（平凡的）
 平凡类型包含：标量类型、平凡类类型、上述类型的数组、这些类型的有cv限定的版本。
@@ -2196,3 +2324,5 @@ int main() {
 
 ## 未定义行为(ud)
 C++标准没有定义某种操作的后果,因此会导致在不同的实现中会有不同的结果.
+
+## 对象切割(对象切片)
