@@ -443,6 +443,24 @@
     - [窗口位置与像素比](#窗口位置与像素比)
       - [像素比](#像素比)
     - [窗口大小](#窗口大小)
+    - [视口位置](#视口位置)
+    - [导航与打开新窗口](#导航与打开新窗口)
+      - [弹窗屏蔽程序](#弹窗屏蔽程序)
+    - [定时器](#定时器)
+    - [系统对话框](#系统对话框)
+  - [location对象](#location对象)
+    - [查询字符串](#查询字符串)
+      - [URLSearchParams](#urlsearchparams)
+    - [操作地址](#操作地址)
+  - [navigator对象](#navigator对象)
+    - [检测插件](#检测插件)
+    - [注册处理程序](#注册处理程序)
+  - [screen对象](#screen对象)
+  - [history对象](#history对象)
+    - [导航](#导航)
+    - [历史状态管理](#历史状态管理)
+- [客户端检测](#客户端检测)
+  - [能力检测](#能力检测)
 
 # 认识JavaScript
 `JavaScript`包含: 核心(ECMAScript), 文档对象模型(DOM), 浏览器对象模型(BOM).
@@ -9583,6 +9601,8 @@ window.moveTo(0, 0);
 window.moveBy(0, 100);
 ````
 
+移动窗口的方法可能被浏览器禁用.
+
 #### 像素比
 一CSS像素约为1/96英寸.定义为屏幕距离人眼一臂长时,0.0213°在屏幕上的长度为一CSS像素.相同分辨率的不同设备可能会有不同的CSS像素.物理像素与CSS像素的比率由`window.devicePixelRatio`属性提供.例如物理分辨率为`1920×1080`,CSS像素分辨率为`640×320`的设备的`window.devicePixelRatio`为`3`.
 
@@ -9612,6 +9632,501 @@ if (typeof pageWidth != "number") {
 }
 ````
 
-而在移动设备上,不同浏览器确定布局视口和视觉视口会有所差异.
+而在移动设备上,不同浏览器确定布局视口和视觉视口会有所差异.详见:[A Tale of Two Viewports--Part Two](https://www.quirksmode.org/mobile/viewports2.html)
 
+`resizeTo()`和`resizeBy()`方法可以调整窗口的大小.这两个方法都接收两个参数,`resizeTo()`接收新的宽度和高度值,`resizeBy()`接收宽度和豪赌各要缩放多少:
+````JS
+// 缩放到100×100
+window.resizeTo(100, 100);
+// (在上述方法执行成功的条件下)缩放到200×150
+window.resizeBy(100, 50);
+// 缩放到300×300
+window.resizeTo(300, 300);
+````
+
+缩放窗口的方法在浏览器可能被禁用.
+
+### 视口位置
+一般浏览器可以通过右侧或者下方滚轮来在有限的视口中查看完整的文档.
+
+`window.scrollX`返回文档/页面水平方向滚动的像素值.`window.scrollY`返回文档/页面垂直方向滚动的像素值.
+
+`window.pageXoffset`或`window.pageYoffset`虽然分别与上述值相同,但**已弃用**.
+
+`scroll()`和`scrollTo()`和`scrollBy()`方法可以滚动页面.`scroll()`与`scrollTo()`是相同的,接收x和y坐标,表示要滚动到的坐标.`scrollBy()`接收两个参数,表示要横向和纵向滚动的距离:
+````JS
+// 向下滚动100像素
+window.scrollBy(0, 100);
+// 相对于当前视口向右滚动40像素
+window.scrollBy(40, 0);
+// 滚动到左上角
+window.scrollTo(0, 0);
+// 滚动到距离屏幕左边和顶边个100像素的位置
+window.scrollTo(100, 100);
+````
+
+这三个方法也接收一个`ScrollToOptions`字典,除了提供偏移量,还可以通过`behavior`属性告诉浏览器是否平滑滚动:
+````JS
+window.scrollTo({
+    left: 100,
+    top: 100,   // 这两个属性相当于之前的x和y
+    behavior: 'auto'    // 依据CSS属性scroll-behavior来确定
+});
+window.scrollBy({
+    left: 100,
+    top: 100,   // 这两个属性相当于之前的x和y
+    behavior: 'smooth'    // 平滑滚动
+});
+// behavior还可以选择值为`instant`,表示立即跳转
+````
+
+### 导航与打开新窗口
+`window.open()`方法可以用于导航到指定URL,也可以用于打开新浏览器窗口.其接收四个参数:要加载的URL,目标窗口,特性字符串,浏览器历史记录相关的布尔值.
+
+第一个参数URL是要加载的链接,类似于`<a>`标签的`src`属性.
+
+第二个参数是目标窗口,类似于`<a>`标签的`target`属性,默认值为`_self`.给定字符串时,它会根据字符串找到拥有该名字的窗口,并在此窗口上打开URL.如果未找到该名字的窗口,则建立一个该名字的新窗口,并打开URL.该参数也可以是特殊的窗口名:`_self`(自身),`_parent`(父窗口),`_top`(顶级窗口),`_blank`(新窗口)
+
+第三个参数是特性字符串,用于包含指定特性,特性是一个字符串,书写方法例如:`"height=400,width=400,top=10,left=10,resizable=yes"`.  
+可用的特性包括:
+- `height`或`innerHeight`:数值.表示新窗口的高度.这个值不能小于100.
+- `left`或`screenX`:数值.表示新窗口的x轴坐标.这个值不能是负值.
+- `top`或`screenY`:数值.表示新窗口的y轴坐标.这个值不能是负值.
+- `width`或`innerWidth`:数值.表示新窗口的宽度.这个值不能小于100.
+- 其他特性详见[MDN-window.open()](https://developer.mozilla.org/zh-CN/docs/Web/API/Window/open)
+- 部分特性已被弃用
+
+该方法返回一个对新建窗口的引用.这个对象和普通的`window`对象没有区别.但部分浏览器可能会允许缩放或移动通过`window.open()`创建的窗口:
+````JS
+let newWin = window.open("https://www.mozilla.org/", "_blank", "height=400, width=400, top=10, left=10, resizable=yes");
+newWin.resizeTo(500, 500);
+newWin.moveTo(100, 100);
+````
+
+新创建的窗口的`top`为其自身.
+
+使用`close()`方法关闭使用`window.open()`创建的窗口.关闭窗口后,窗口的引用虽然还在,但只能用于检查其`closed`属性:
+````JS
+newWin.close();
+console.log(newWin.closed);
+````
+
+通过其他窗口打开的`window`对象有一个属性`opener`,指向打开它的窗口.这个属性只在弹出窗口的最上层`window`对象有定义,其余皆为`null`:
+````JS
+let newWin = window.open("https://www.example.com/", "_blank");
+console.log(newWin.opener === window);  // true
+````
+
+窗口不会记录自己打开的窗口.
+
+某些浏览器中不同标签页运行在独立进程中,使用`open()`打开新窗口(表示两者需要通信)将导致两者运行在同一进程中.将新打开的标签页的`opener`属性设置为`null`,表示新打开的标签页可以运行在独立的进程中(表示两者无需通信).
+
+由于弹出窗口被在线广告滥用,浏览器针对弹窗施加了限制.
+
+#### 弹窗屏蔽程序
+许多浏览器内置了弹窗屏蔽程序.此时`window.open()`很可能就会返回`null`.而针对浏览器扩展或其他程序屏蔽弹窗时,`window.open()`通常会抛出错误.因此:
+````JS
+let blocked = false;
+try {
+    let newWin = window.open("https://www.example.com/", "_blank");
+    if (newWin == null) {
+        blocked = true;
+    }
+} catch (ex) {
+    blocked = true;
+}
+if (blocked) {
+    alert("The popup was blocked!");
+}
+````
+
+### 定时器
+JS在浏览器中是单线程执行的,但允许使用定时器指定在某个时间后或每隔一段时间就执行相应的代码.`setTimeout()`用于指定在一段时间后执行某些代码,而`setInterval()`用于指定每隔一段时间执行某些代码.
+
+`setTimeout`接收任意长的参数,其中,第一个参数是要执行的函数,第二个参数是调用函数前要等待的时间(毫秒),后面的参数是要调用执行函数的参数:
+````JS
+setTimeout(console.log, 1000, 1);   // (1秒后) 1
+````
+
+第二个参数不是执行代码的确切时间,因为`setTimeout`在指定毫秒数之后会把任务添加到任务队列中(详见[期约与异步函数](#期约与异步函数)),而不是立即执行代码.
+
+上述函数返回一个表示该超时排期的数值ID.这个超时ID是被排期执行代码的唯一标识符,用于取消该任务.要取消等待中的排期任务,可以调用`clearTimeout()`方法并传入超时ID:
+````JS
+let timeoutId = setTimeout(console.log, 1000, 1);
+clearTimeout(timeoutId);
+// <无输出>
+````
+
+注意:传入`setTimeout`函数始终会在全局作用域中的一个匿名函数中运行,因此函数中的`this`在非严格模式下始终指向`window`,而在严格模式下是`undefined`.如果函数是箭头函数,则`this`保留为定义它时所在的作用域.
+
+`setInterval()`的参数与`setTimeout()`相同,但指定的任务会每隔指定时间就执行一次,直到取消循环定时或者页面卸载:
+````JS
+setInterval(console.log, 1000, 1);
+// (1秒后) 1
+// (2秒后) 1
+// (3秒后) 1
+// (4秒后) 1
+// ...
+````
+
+注意:浏览器并不关心`setInterval()`中上一个排期的任务是否执行或者执行完成,只要间隔时间一到,就会向任务队列中添加下一个任务,此时,上一个循环任务可能会因此跳过,因此该函数很少使用.要实现类似的效果,可以使用`setTimeout()`配合循环.
+
+`setInterval()`方法返回一个循环定时ID,用于在未来某个时间点上使用`clearInterval()`并传入定时ID来取消循环定时:
+````JS
+let num = 0, intervalId = null;
+let max = 10;
+let incrementNumber = function() {
+    console.log(++num);
+    if (num == max) {
+        clearInterval(intervalId);
+        console.log("Done");
+    }
+}
+intervalId = setInterval(incrementNumber, 100);
+````
+
+### 系统对话框
+`alert()`,`confirm()`和`prompt()`方法可以让浏览器调用系统对话框向用户显示消息.这些对话框与网页无关(即不包括HTML和CSS,外观由操作系统或者浏览器决定).这些对话框都是同步的模态对话框,即在它们显示的时候,代码会停止运行,消失之后,代码才会恢复执行.
+
+`alert()`方法只接收一个要显示给用户的字符串.调用后会显示一个对话框,其中只有一个确定按钮.传入任何不是字符串的参数都会调用`toString()`方法将其转换为字符串.警告框(alert)通常用于向用户显示一些他们无法控制的消息,比如报错.
+````JS
+alert("Hello world");
+````
+![alert()](img/get_start/alert.png)
+
+确认对话框使用`confirm()`方法来显示.其参数与`alert()`相同.确认框有两个按钮:"取消"和"确定",用户通过单击不同的按钮表明希望接下来执行什么操作.该方法返回`true`(当单击"确定"时)或`false`(当单击"取消"或者关闭确认框时):
+````JS
+if (confirm("Are you sure?")) {
+    alert("I'm so glad you're sure!");
+} else {
+    alert("I'm sorry to hear you're not sure.");
+}
+````
+![confirm()](img/get_start/comfirm.png)
+
+提示框通过调用`prompt()`方法来显示.提示框的用途是提示用户输入消息.除了"确定"和"取消"按钮,提示框还会显示一个文本框,让用户输入内容.其接收两个参数:要显示给用户的文本和文本框的默认值.如果用户单击了"确定"按钮,则返回文本框中的值.如果用户单击了"取消"按钮,或者关闭了对话框,则返回`null`:
+````JS
+let result = prompt("What is your name?", "ABC");
+if (result !== null) {
+    alert("Welcome, " + result);
+}
+````
+![prompt()](img/get_start/prompt.png)
+
+很多浏览器会在脚本产生两个或更多对话框时,在除第一个以外的对话框上显示一个复选框,让用户选择是否禁用后续的弹框,直到页面刷新.开发者无法获悉这些弹窗是否显示了.上述的对话框计数器会在浏览器空闲时重置,即非连续地独立显示两个警告框不会显示复选框.
+
+`find()`和`print()`对话框是非模态的.用户在浏览器菜单上选择"查找"(find)和"打印"(print)时显示的就是这两种对话框:
+````JS
+window.print();
+window.find();
+````
+这两个方法不会返回任何有关用户的信息.此外,浏览器的对话框计数器不会涉及它们,而且用户选择禁用对话框对它们也没有影响:
+
+## location对象
+`location`是最有用的BOM对象之一,提供了当前窗口中加载文档的信息,以及通常的导航功能.这个对象既是`window`的属性,也是`document`的属性,也就是说,`window.location`和`document.location`指向同一个对象.`location`对象不仅保存着当前加载文档的信息,也保存着把URL解析为离散片段后能够通过属性访问的信息.  
+假设浏览器当前加载的URL为`http://foouser:barpassword@www.example.com:80/myPath/?q=javascript#contents`,则:
+
+- `属性`
+  - `值` 
+  - `说明`
+- location.hash
+  - "#contents"
+  - URL散列值(#后跟零或多个字符),如果没有则为空字符串
+- location.host
+  - "www.example.com:80"
+  - 服务器名及端口号
+- location.hostname
+  - "www.example.com"
+  - 服务器名
+- location.href
+  - "http://www.example.com:80/myPath/?q=javascript#contents"
+  - 当前加载页面的完整URL.`location`的`toString()`方法返回这个值
+- location.pathname
+  - "/myPath/"
+  - URL中的路径和(或)文件名
+- location.port
+  - "80"
+  - 请求的端口.如果URL中没有端口,则返回空字符串
+- location.protocol
+  - "http:"
+  - 页面使用的协议.通常是`http:`或`https:`
+- location.search
+  - "?q=javascript"
+  - URL的查询字符串.这个字符串以问号开头
+- location.username
+  - "foouser"
+  - 域名前指定的用户名
+- location.password
+  - "barpassword"
+  - 域名前指定的密码
+- location.origin
+  - "http://www.example.com"
+  - URL的源地址.只读
+
+### 查询字符串
+为了要解析URL中`?`后面的每一个参数(即查询字符串,`location.search`返回值),可以使用以下函数:
+````JS
+let getQueryStringArgs = function() {
+    let qs = (location.search.length > 0 ? location.search.substring(1) : "").
+        args = {};
+    for (let item of qs.split("&").map(kv => kv.split("="))) {
+        let name = decodeURIComponent(item[0]), // 查询字符串通常是被编码后的格式
+            value = decodeURIComponent(item[1]);
+        if (name.length) {
+            args[name] = value;
+        }
+    }
+    return args;
+}
+let args = getQueryStringArgs();    // 假设查询字符串为?q=javascript&num=10
+console.log(args["q"]);     // "javascript"
+console.log(args["num"]);   // "10"
+````
+
+#### URLSearchParams
+`URLSearchParams`提供了一组标准API方法,通过它们可以检查和修改查询字符串.给`URLSearchParams`构造函数传入一个查询字符串,就可以创建一个实例.这个实例暴露了`get()`,`set()`和`delete()`等方法,可以对查询字符串执行相应的操作:
+````JS
+let qs = "?q=javascript&num=10";
+let searchParams = new URLSearchParams(qs);
+console.log(searchParams.toString());   // " q=javascript&num=10"
+searchParams.has("num");    // true
+searchParams.get("num");    // 10
+searchParams.set("page", "3");
+console.log(searchParams.toString());   // " q=javascript&num=10&page=3"
+searchParams.delete("q");
+console.log(searchParams.toString());   // " num=10&page=3"
+````
+
+大多数支持`URLSearchParams`的浏览器也支持将`URLSearchParams`的实例用作可迭代对象:
+````JS
+let qs = "?q=javascript&num=10";
+let searchParams = new URLSearchParams(qs);
+for (let param of searchParams) {
+    console.log(param);
+}
+// ["q", "javascript"]
+// ["num", "10"]
+````
+
+### 操作地址
+可以通过修改`location`对象修改浏览器的地址.
+
+使用`assign()`方法并传入一个URL来修改浏览器地址:
+````JS
+location.assign("https://www.example.com");
+````
+这行代码会立即启动导航到新URL的操作,同时在浏览器历史记录中增加一条记录.如果给`location.href`或`window.location`设置一个URL,也会以同一个URL值调用`assign()`方法.比如下面两行代码都会显式调用`assign()`一样的操作:
+````JS
+window.location = "https://www.example.com";
+location.href = "https://www.example.com";
+````
+这三种方法中设置`location.href`是最常见的.
+
+修改`location`对象的属性也会修改当前加载的页面.其中,`hash`,`search`,`hostname`,`pathname`,`port`属性被设置为新值之后都会修改当前URL,如:
+````JS
+// 假设当前URL为https://www.example.com/ABC/
+location.hash = "#section1";    // https://www.example.com/ABC/#section1
+location.search = "?q=javascript";  // https://www.example.com/ABC/?q=javascript#section1
+location.hostname = "www.somewhere.com";    // https://www.somewhere.com/ABC/?q=javascript#section1
+location.pathname = "mydir";    // https://www.somewhere.com/mydir/?q=javascript#section1
+location.port = 8080;   // https://www.somewhere.com:8080/mydir/?q=javascript#section1
+````
+除了`hash`以外,只要修改`location`的一个属性,就会导致页面重新加载新URL.但修改`hash`的值仍然会在浏览器历史中增加一条新记录.
+
+通过上面的方法,都是会在浏览器中增加相应的记录的,也可以在用户单击"后退"按钮时,导航到前一个页面.
+
+使用`replace()`方法可以既不增加历史记录,也不能回到前一个.其接收一个URL参数:
+````JS
+location.replace("https://www.example.com");
+````
+
+`reload()`方法能够重新加载当前显示的页面.如果不传参数,页面会以最有效的方式重新加载(有可能从缓存中加载页面).传入`true`作为参数会强制从服务器重新加载:
+````JS
+location.reload();      // 可能是从缓存中加载
+location.reload(true);  // 从服务器加载
+````
+
+脚本中位于`reload()`调用之后的代码可能执行也可能不执行,这取决于网络延迟和系统资源等因素.调用`reload()`将会导致浏览器重新执行JS代码,因此不在分支中使用`reload()`可能会导致反复重新加载.
+
+## navigator对象
+浏览器一定存在`navigator`对象,但每个浏览器都支持自己的属性.
+
+`navigator`对象实现了`NavigatorID`,`NavigatorLanguage`,`NavigatorOnLine`,`NavigatorContentUtils`,`NavigatorStorage`,`NavigatorStorageUtils`,`NavigatorConcurrentHandware`,`NavigatorPlugins`和`NavigatorUserMedia`接口定义的属性和方法:
+- `属性方法`:`说明`
+- `activeVrDisplays`:返回数组,包含`ispresenting`属性为`true`的`VRDisplay`实例.
+- `appCodeName`:即使在非Mozilla浏览器中也会返回`"Mozilla"`.
+- `appName`:浏览器全名.
+- `appVersion`:浏览器版本.通常比实际的浏览器版本不一致.
+- `battery`:返回暴露`Battery Status API`的`BatteryManager`对象.
+- `bulidId`:浏览器的构建编号.
+- `connection`:返回暴露`Network Information API`的`NetworkInformation`对象.
+- `cookieEnabled`:返回布尔值,表示是否启用了cookie.
+- `credentials`:返回暴露`Credentials Management API`的`CredentialsContainer`对象.
+- `deviceMemory`:返回单位为GB的设备内存容量.
+- `doNotTrack`:返回用户的"不追踪"(do-not-track)设置.
+- `geolocation`:返回暴露`GeolocationAPI`的`Geolocation`对象.
+- `getVRDisplays()`:返回数组,包含可以的每个`VRDisplay`实例.
+- `getUserMedia()`:返回与可用媒体设备硬件关联的流.
+- `handwareConcurrency`:返回设备的处理器核心数量.
+- `javaEnabled`:返回布尔值,表示浏览器是否启用了Java.
+- `language`:返回浏览器的主语言.
+- `languages`:返回浏览器偏好的语言数组.
+- `locks`:返回暴露`Web Locks API`的`LockManager`对象
+- `mediaCapabilities`:返回暴露`Media Capabilities API`的`MediaCapabilities`对象
+- `mediaDevices`:返回可用的媒体设备.
+- `maxTouchPoints`:返回设备触摸屏支持的最大触点数.
+- `mimeTypes`:返回浏览器中注册的MIME类型数组.
+- `onLine`:返回布尔值,表示浏览器是否联网.
+- `oscpu`:返回浏览器运行设备的操作系统和(或)CPU.
+- `permissions`:返回暴露`Permission API`的`Permissions`对象.
+- `platform`:返回浏览器运行的系统平台.
+- `plugins`:返回浏览器安装的插件数组.在IE中,这个数组包含页面中所有`<embed>`元素.
+- `product`:返回产品名称(通常是`"Gecko"`).
+- `productSub`:返回产品的额外信息(通常是`Gecko`的版本).
+- `registerProtocolHandler()`:将一个网站注册为特定协议的处理程序.
+- `requestMediaKeySystemAccess()`:返回一个期约,解决为`MediaKeySystemAccess`对象.
+- `sendBeacon()`:异步传输一些小数据.
+- `serviceWorker`:返回用来与`ServiceWorker`实例交互的`ServiceWorkerContianer`.
+- `share()`:返回当前平台的原生共享机制.
+- `storage`:返回暴露`Storage API`的`StorageManager`对象.
+- `userAgent`:返回浏览器的用户代理字符串.
+- `vendor`:返回浏览器的厂商名称.
+- `venderSub`:返回浏览器厂商的更多信息.
+- `vibrate()`:触发设备振动.
+- `webdriver`:返回浏览器当前是否被自动化程序控制.
+
+### 检测插件
+可以通过`plugins`数组来检测浏览器的插件(IE10及以下不行).这个数组中的每一项都包含如下属性:
+- `name`:插件名称.
+- `description`:插件介绍.
+- `filename`:插件的文件名.
+- `length`:由当前插件处理的MIME类型数量.
+- `MimeType对象`:(需要通过中括号访问)包含4个属性:
+  - `description`:描述MIME类型.
+  - `enabledPlugin`:指向插件对象的指针.
+  - `suffixes`:该MIME类型对应扩展名的逗号分隔的字符串.
+  - `type`:完整的MIME类型字符串.
+
+所谓检测插件,就是遍历浏览器中可用的插件,并逐个比较插件的名称,如下:
+````JS
+// 插件检测,IE10及更低版本无效
+let hasPlugin = function(name) {
+    name = name.toLowerCase();
+    for (let plugin of window.navigator.plugins) {
+        if (plugin.name.toLowerCase().indexOf(name) > -1) {
+            return true;
+        }
+    }
+    return false;
+}
+// 检测Flesh
+console.log(hasPlugin("Flash"));
+````
+
+对于IE10及以下版本,不支持`Netscape`式的插件,需要使用专有的`ActiveXObject`,并尝试实例化特定的插件.IE中的插件是实现为COM对象的,由唯一字符串标识.例如:
+````JS
+// 在旧版本IE中检测插件
+function hasIEPlugin(name) {
+    try {
+        new ActiveXObject(name);
+        return true;
+    } catch (ex) {
+        return false;
+    }
+}
+// 检测Flash
+console.log(hasIEPlugin("ShockwaveFlash.ShockwaveFlash"));
+````
+
+将两种方式整合,用于检测特定插件的方法如下:
+````JS
+// 在所有浏览器中检测Flash
+function hasFlash() {
+    var result = hasPlugin("Flash");
+    if (!result) {
+        result = hasIEPlugin("ShockwaveFlash.ShockwaveFlash");
+    }
+    return result;
+}
+console.log(hasFlash());
+````
+
+`plugins`有一个`refresh()`方法,用于刷新`plugins`属性以反映新安装的插件.这个方法接收一个布尔值参数,表示刷新时是否重新加载页面.如果传入`true`,则所有包含插件的页面都会重新加载.否则,只有`plugins`会更新,但页面不会重新加载.
+
+### 注册处理程序
+`navigator`支持`registerProtocolHandler()`方法.这个方法可以把一个网站注册为处理某种特定类型信息应用程序.可以借助这个方法将Web应用程序注册为像桌面软件一样的默认应用程序.
+
+要使用`registerProtocolHandler()`方法,必须传入3个参数:要处理的协议(如"mailto"或"ftp"),处理该协议的URL,以及应用名称.例如,要把一个Web应用程序注册为默认邮件客户端,可以这样做:
+````JS
+navigator.registerProtocolHandler("mailto",
+    "http://www.somemailclient.com?cmd=%s",
+    "Some Mail Client");
+````
+这个例子为`"mailto"`协议注册了一个处理程序,这样邮件地址就可以通过指定的Web应用程序打开.第二个参数是负责处理请求的URL,`%s`表示原始的请求.
+
+## screen对象
+`window`的另一个属性`screen`对象,在编程中很少使用.这个对象保存的纯粹是客户端能力的信息,即显示器的信息:
+- `属性`:`说明`
+- `availHeight`:屏幕像素高度减去系统组件高度(只读).
+- `availLeft`:没有被系统组件占用的屏幕的最左侧像素(只读).
+- `availTop`:没有被系统组件占用的屏幕的最顶端像素(只读).
+- `availWidth`:屏幕像素高度减去系统组件宽度(只读).
+- `colorDepth`:表示屏幕颜色的位数,多数系统是32(只读).
+- `height`:屏幕像素高度.
+- `left`:当前屏幕左边的像素距离.
+- `pixelDepth`:屏幕的位深(只读).
+- `top`:当前屏幕顶端的像素距离.
+- `width`:屏幕像素宽度.
+- `orientation`:返回`Screen Orientation API`中屏幕的朝向.
+
+## history对象
+`history`对象表示当前窗口首次使用以来用户的导航历史记录.每个`window`都有自己的`history`对象.出于安全考虑,这个对象不会暴露用户访问过的URL,但可以通过它在不知道实际URL的情况下前进和后退.
+
+### 导航
+`go()`方法可以在用户历史记录中沿任何方向导航,可以前进也可以后退.这个方法只接受一个参数,这个参数可以是一个整数(在旧版浏览器还允许传入字符串),表示前进或后退多少步.负值表示在历史记录中后退(类似点击浏览器的"后退"按钮),而正值表示在历史记录中前进(类似点击浏览器的"前进"按钮):
+````JS
+// 后退一页
+history.go(-1);
+// 前进一页
+history.go(1);
+// 前进两页
+history.go(2);
+````
+
+`go()`还有两个简写方法:`back()`和`forword()`.这两个方法模拟了浏览器的后退和前进按钮.
+
+`history`对象还有一个`length`属性,表示历史记录中有多个条目.这个属性反映了历史记录的数量.对于窗口或标签页中加载的第一个页面,`history.length`等于1.
+
+### 历史状态管理
+`hashchange`会在页面URL的散列变化是被触发,开发者可以在此时执行某些操作.而状态管理API则可以让开发者改变浏览器URL而不会加载新页面.为此,可以使用`history.pushState()`方法.这个方法接收3个参数:一个state对象,一个新状态的标题和一个(可选的)相对URL.例如:
+````JS
+let stateObject = {foo: "bar"};
+history.pushState(stateObject, "my title", "baz.html");
+````
+
+`pushState()`方法执行后,状态信息就会被推到历史记录中,浏览器地址栏也会改变以反映新的相对URL.除了这些变化以外,即使`location.href`返回的是地址栏中的内容,浏览器页不会向服务器发送请求.第二个参数并未被当前实现所使用.第一个参数应该包含正确初始化页面状态所必需的信息.这个状态对象的大小是有限制的,通常在500KB~1MB之间(为防止滥用).
+
+`pushState()`会创建新的历史记录,此时单击"后退"按钮,就会触发`window`对象上的`popstate`事件.该事件对象有一个`state`属性,其中包含通过`pushState()`第一个参数传入的`state`对象:
+````JS
+window.addEventListListener("popstate", (event) => {
+    let state = event.state;
+    if (state) {    // 第一个页面加载时状态是null
+        processState(state);
+    }
+});
+````
+
+基于这个状态,应该把页面重置为状态对象所表示的状态.可以通过`history.state`获取当前的状态对象,也可以使用`replaceState()`并传入与`pushState()`同样的前两个参数来更新状态对象.更新状态不会创建新历史记录,只会覆盖当前状态:
+````JS
+history.replaceState({newFoo: "newBar"}, "New title");
+````
+
+传给`pushState()`和`replaceState()`的`state`对象应该只包含可以被序列化的信息.因此DOM元素之类并不适合放到状态对象里保存.
+
+状态管理时,应当确保`pushState()`创建URL背后都对应一个真实的物理URL,即使不会被使用.否则,单击"刷新"按钮会导致404错误.
+
+# 客户端检测
+由于现实中,浏览器之间总会有莫名的差异,客户端检测成为了一种补救措施以及开发策略的重要一环.
+
+## 能力检测
 
