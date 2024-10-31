@@ -461,6 +461,23 @@
     - [历史状态管理](#历史状态管理)
 - [客户端检测](#客户端检测)
   - [能力检测](#能力检测)
+    - [安全能力检测](#安全能力检测)
+    - [基于能力检测进行浏览器分析](#基于能力检测进行浏览器分析)
+      - [检测特性](#检测特性)
+      - [检测浏览器](#检测浏览器)
+      - [能力检测的局限](#能力检测的局限)
+  - [用户代理检测](#用户代理检测)
+    - [浏览器分析](#浏览器分析)
+      - [伪造用户代理](#伪造用户代理)
+      - [分析浏览器](#分析浏览器)
+  - [软件与硬件检测](#软件与硬件检测)
+    - [识别浏览器与操作系统](#识别浏览器与操作系统)
+    - [浏览器元数据](#浏览器元数据)
+      - [Geolocation API](#geolocation-api)
+      - [Connection State和NetworkInformation API](#connection-state和networkinformation-api)
+      - [Battery Status API](#battery-status-api)
+    - [硬件](#硬件)
+- [DOM](#dom-1)
 
 # 认识JavaScript
 `JavaScript`包含: 核心(ECMAScript), 文档对象模型(DOM), 浏览器对象模型(BOM).
@@ -2540,6 +2557,8 @@ vectorList.push(vector);
 JS数组是可变了,当容量超限时,会创建一个新的数组,并删除原来的数组,为避免上述操作,可以事先预测数组的大小.
 
 # 基本引用类型
+*本章所给出的类型只需要知道其存在,具体API可以查看文档.*
+
 ES6之前不存在`类`,只存在引用类型,即把数据和功能组织到一起的结构.引用类型也被称为对象定义.
 
 对象时某个特定引用类型的实例.新对象通过使用`new`操作符后跟一个`构造函数`来创建(不要尝试舍弃`new`,这将导致调用转型函数).例如:
@@ -4861,6 +4880,8 @@ g.throw('foo');
 
 # 对象,类,面向对象编程
 ES中对象是一组属性无序的集合.对象的每个属性或方法都由一个名称来标识,名称映射到一个值.因此,可以把ES对象当作一个`unordered_map`.
+
+*本章可以只看[对象](#对象)的内容,然后跳过[创建对象](#创建对象)和[继承](#继承)的内容,直接看[类](#类)的相关内容,因为后者是前两者的语法糖.*
 
 ## 对象
 创建自定义对象的通常方法是创建`Object`的一个新实例,然后再给它添加属性和方法.  
@@ -10129,4 +10150,274 @@ history.replaceState({newFoo: "newBar"}, "New title");
 由于现实中,浏览器之间总会有莫名的差异,客户端检测成为了一种补救措施以及开发策略的重要一环.
 
 ## 能力检测
+能力检测,即在JS运行时测试浏览器是否持某种特性.这种方式不要求事先知道浏览器的信息,只需要检测自己关心的能力是否存在即可.能力检测的基本模式如下:
+````JS
+if (object.propertyInQuestion) {
+    // 使用object.propertyInQuestion
+}
+````
+
+例如:
+````JS
+function getElement(id) {
+    if (document.getElementById) {
+        return document.getElementById(id);
+    } else if (document.all) {
+        return document.all[id];
+    } else {
+        throw new Error("No way to retrieve element!");
+    }
+}
+````
+
+应当先检测最有可能的方式.不能通过检测一个属性或方法从而假定另一个属性或方法的存在(或确定用户所使用的浏览器).
+
+### 安全能力检测
+能力检测应当验证存在的同时,确保其能够展现出预期的行为.  
+例如,要前侧是否存在排序函数不应该检测:
+````JS
+function isSortable(object) {
+    return !!object.sort;
+}
+````
+应为上述`sort`可能是一个属性而非方法,使用`()`可能会抛出错误.应当使用:
+````JS
+function isSortable(object) {
+    return typeof object.sort == "function";
+}
+````
+
+有些时候这种方法可能会失效,要深入理解JS能力检测,详见:[Feature Detection: State of the Art Browser Scripting](http://peter.michaux.ca/articles/feature-detection-state-of-the-art-browser-scripting)
+
+### 基于能力检测进行浏览器分析
+#### 检测特性
+可以按照能力将浏览器归类:
+````JS
+// 检测浏览器是否支持Netscape式插件
+let hasNSPlugins = !!(navigator.plugins && navigator.plugins.length);
+````
+
+#### 检测浏览器
+根据对浏览器特性的检测并与已知特性对比,可以确认用户使用的是什么浏览器.但对于符合标准的浏览器,可能不会适用.  
+例如:
+````JS
+class BrowserDetector {
+    constructor() {
+        // 测试条件编译;IE6~10支持
+        this.isIE_Gte6Lte10 = /*@cc_on!@*/false;
+
+        // 测试documentMode;IE7~11支持
+        this.isIE_Gte7Lte11 = !!document.documentMode;
+
+        // 测试StyleMedia构造函数;Edge20及以上支持
+        this.isEdge_Gte20 = !!window.styleMedia;
+
+        // 测试Firebox专有扩展安装API;所有版本的Firebox都支持
+        this.isFirefox_Gte1 = typeof InstanllTrigger !== 'undefined';
+
+        // 测试chrome对象及其webstore属性;Opera的某些版本有window.chrome,但没有window.chrome.webstore;所有版本的Chrome都支持
+        this.isChrome_Gte1 = !!window.chrome && !!window.chrome.webstore;
+
+        // Safari早期版本会给构造函数的标签符追加"Constructor"字样;Safari 3~9.1支持
+        this.isSafari_Gte3Lte9_1 = /constructor/i.test(window.Element);
+
+        // 推送通知API暴露在window对象上,适用默认参数值以避免对undefined调用toString();Safari 7.1及以上版本支持
+        this.isSafari_Gte7_1 = 
+            (({pushNotification = {}} = {}) =>
+              pushNotification.toString() == '[object SafariRemoteNotification]'
+            )(window.safari);
+
+        // 测试addons属性;Opera 20及以上版本支持
+        this.isOpera_Gte20 = !!window.opr && !!window.opr.addons;
+    }
+    isIE() { return this.isIE_Gte6Lte10 || this.isIE_Gte7Lte11; }
+    isEdge() { return this.isEdge_Gte20 && !this.isIE(); }
+    isFirefox() { return this.isFirefox_Gte1; }
+    isChrome() { return this.isChrome_Gte1; }
+    isSafari() { return this.isSafari_Gte3Lte9_1 || this.isSafari_Gte7_1; }
+    isOpera() { return this.isOpera_Gte20; }
+}
+// 随着浏览器变迁和发展,可以不断调整上述底层检测逻辑
+````
+
+#### 能力检测的局限
+通过检测一种或一组能力,并不总能确定使用的是哪种浏览器.
+````JS
+let isFirefox = !!(navigator.vendor && navigator.vendorSub);    // 不够特殊,Safari后来也实现了同样的属性
+let isIE = !!(document.all && document.uniqueID);   // 假设太多
+````
+
+## 用户代理检测
+用户代理检测通过浏览器用户代理字符串确定使用的是什么浏览器.用户代理字符串包含在每个HTTP请求的头部,在JS中可以通过`navigator.userAgent`访问.在服务器段,可以根据用户代理字符串确定浏览器并执行相应操作.而在客户端,用户代理检测被认为是不可靠的,只应该在没有其他选项时再考虑.
+
+> 基于用户代理字符串来识别浏览器是**不可靠**的且**不推荐**,因为用户代理字符串是可以由用户配置的.
+
+在很长一段时间里,浏览器都通过在用户代理字符串包含错误或误导性信息来欺骗服务器:
+- `Mosaic`(早期浏览器)的代理字符串类似于:`Mosaic/0.9`
+- `Netscape Navigator`(Mozilla)浏览器的代理字符串格式为:`Mozilla/Version [Language] (Platform; Encryption)`
+- 微软为了让`IE`能打开检测是否为`Netscape Navigator`的浏览器,使其代理字符串格式为:`Mozilla/Version (Platform; Encryption [; OS-or-CPU description])`
+- `Firebox`的渲染引擎`Gecko`使用的代理字符串格式为:`Mozilla/MozillaVersion (...)`
+- `Safari`浏览器的渲染引擎为`WebKit`,为了让浏览器不被排除在流行站点以外,其代理字符串格式为:`Mozilla/5.0 (...) AppleWebKit/AppleWebKitVersion (...) Safari/SafariVersion`
+- `Konqueror`浏览器的渲染引擎为`KHTML`.为了实现最大化兼容,其采用的代理字符串格式为:`Mozilla/5.0 (...; Konqueror/Version; ...)`
+- `Chrome`使用`Blink`作为渲染引擎,使用`V8`作为JS引擎.其用户代理字符串包含所有`WebKit`信息:`Mozilla/5.0 (...) AppleWebKit/AppleWebKitVersion (...) Chrome/ChromeVersion Safari/SafariVersion`
+- `Opera`在`Opera 8`及以前的格式为:`Opera/Version (...)`;但在`Opera 9`时,会在不同网站伪装成`Firebox`或`IE`且不通知用户;而在`Opera 10`时,其用户代理字符串变成了:`Opera/9.80 (OS-or-CPU; Encryption; Language) Presto/PrestoVersion Version/Version`
+- 对于`iOS`与`Android`,系统默认的浏览器都是基于`WebKit`的,因此与`Safari`相似,但会加上`like Mac OS X`来表示这是和`Mobile`相关的.
+
+### 浏览器分析
+#### 伪造用户代理
+用户代理是可以造假的,即使`window.navigator.userAgent`是只读的.
+
+在某些浏览器,可以使用浏览器私有的`__defineGetter__`方法来篡改用户代理字符串:
+````JS
+console.log(window.navigator.userAgent);
+// Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0
+window.navigator.__defineGetter__('userAgent', () => 'foobar');
+console.log(window.navigator.userAgent);    // foobar
+````
+在`Firefox`中,可以通过`about:config`修改`general.useragent.override`偏好设置来更改用户代理.
+
+`Opera 6`及更高版本允许用户通过菜单设置浏览器标识字符串.
+
+#### 分析浏览器
+通过解析浏览器返回的用户代理字符串,可以推断出下列相关的环境信息:
+- 浏览器
+- 浏览器版本
+- 浏览器渲染引擎
+- 设备类型(桌面/移动)
+- 设备生产商
+- 设备型号
+- 操作系统
+- 操作系统版本
+
+但新浏览器,新操作系统,新硬件设备随时可能出现,因此,用户代理解析程序需要与时俱进,频繁更新.可以使用以下第三方用户代理解析程序:
+- [Bowser](https://github.com/bowser-js/bowser)
+- [UAParser.js](https://github.com/faisalman/ua-parser-js)
+- [Platform.js](https://github.com/bestiejs/platform.js)(archived)
+- [CURRENT-DEVICE](https://github.com/matthewhudson/current-device)
+- [Google Closure](https://github.com/google/closure-library)(archived)
+- [Mootools](https://github.com/mootools/mootools-core)
+
+[Mozilla wiki - Compatibility/UADetectionLibraries](https://wiki.mozilla.org/Compatibility/UADetectionLibraries)提供了用户代理解析程序的列表(JS部分包含客户端库和`Node.js`库).
+
+## 软件与硬件检测
+通过暴露在`window.navigator`上的一组API,可以获得一组与页面执行环境相关的信息,包括浏览器,操作系统,硬件和周边设备信息.
+
+*注意:其中很多API不是强制性的,且很多浏览器没有支持,有些特性也不一定可靠.*
+
+### 识别浏览器与操作系统
+- `navigator.oscpu`:其标准要求返回空字符串或者表示浏览器所在平台的字符串,比如:`"Windows NT 10.0; Win64; x64"`或`"Linux x86_64"`.
+- `navigator.vendor`:通常包含浏览器开发商信息.返回这个字符串是浏览器`navigator`兼容模式的一个功能.其标准要求返回一个空字符串,也可能返回字符串`"Apple Computer, Inc."`或字符串`"Google Inc."`.
+- `navigator.platform`:其标准要求返回一个空字符串或表示浏览器所在平台的字符串,例如`"MacIntel"`,`"Win32"`,`"FreeBSD i386"`或`"WebTV OS"`.
+- `screen.colorDepth`和`screen.pixelDepth`:其标准要求返回输出设备中每像素用于显示颜色的位数,不包含`alpha`通道.
+- `screen.orientation`:返回一个`ScreenOrientation`对象,其中包含`Screen Orientation API`定义的屏幕信息:
+  - `angle`:返回相对于默认状态下屏幕的角度(不能假设`0`始终是初始值).
+  - `type`:返回以下4中枚举值之一(不能假设`portrait-primary`始终是初始值):
+    - `portrait-primary`
+    - `portrait-secondary`
+    - `landscape-primary`
+    - `landscape-secondary`
+
+### 浏览器元数据
+`navigator`对象暴露出一些API,可以提供浏览器和操作系统的状态信息.
+
+#### Geolocation API
+`navigator.geolocation`属性暴露了`Geolocation API`,可以让浏览器脚本感知当前设备的地理位置.这个API只在安全执行环境(通过HTTPS获取的脚本)中可用.根据不同的配置,返回结果的精度可能不一样.
+
+`Geoloaction API`规范规定:地理位置信息的主要来源是GPS和IP地址,射频识别(RFID),`Wi-Fi`及蓝牙Mac地址,`GSM/CDMA`蜂窝ID以及用户输入等信息.
+
+*注意:有时候并没有GPS,此时浏览器会收集所有可用的无线网络,包括`Wi-Fi`和蜂窝信号.拿到这些信号后,再去查询网络数据库.这样就可以精确地报告出你的设备位置.*
+
+`getCurrentPosition()`方法返回一个`Coordinates`对象:
+````JS
+let p;
+navigator.geolocation.getCurrentPosition((position) => p = position);
+console.log(p.timestamp);   // 1525364883361
+console.log(p.coords);      // Coordinates {...}
+````
+上述代码中,`timestamp`表示查询时间的时间戳.浏览器可能会不允许访问这些数据(或者等待用户选择允许/拒绝该权限),因此见下文对第二个参数的描述.
+
+`Coordinates`对象包含:
+- `latitude`:经度,例如`37.4854409`.
+- `longitude`:纬度,例如`-122.2325506`.
+- `accuracy`:精度,单位为米,例如:`58`.
+- `altitude`:海拔高度,相对于1984世界大地坐标系地球表面以米为单位的距离(可能为空).
+- `altitudeAccuracy`:海拔高度的精度,单位为米(可能为空).
+- `speed`:表示设备每秒移动的速度.
+- `heading`:朝向,表示相对于正北方向移动的角度(0<=`heading`<360).
+
+`getCurrentPosition()`方法的接收第二个参数(回调函数)作为获取失败时调用的函数,这个函数会收到一个`PositionError`对象,其中包含:
+- `code`:一个整数,表示以下3中错误:
+  - `PERMISSION_DENIED`:浏览器未被允许访问设备位置.页面第一次尝试访问`Geolocation API`时,浏览器会弹出确认对话框取得用户授权(每个域分别获取).如果返回了这个错误码,则要么是用户不同意授权,要么是在不安全的环境下访问了`Geolocation API`.`message`属性还会提供额外信息.
+  - `POSITION_UNAVAILABLE`:系统无法返回任何位置信息.这个错误码可能代表各种失败原因,但相对来说并不常见,因为只要设备能上网,就至少可以根据IP地址返回一个低精度的坐标.
+  - `TIMEOUT`:系统不能在超时时间内返回位置信息,例如用户在超时前未选择是否授权,见下文.
+- `message`:包含对错误的简短描述.
+
+例如:
+````JS
+navigator.geolocation.getCurrentPosition(
+    () => {},
+    (e) => {
+        console.log(e.code);
+        console.log(e.message);
+    }
+);
+````
+
+`Geolocation API`可以使用`PositionOptions`对象来配置,作为第三个参数提供.这个对象支持以下3个属性:
+- `enableHighAccuracy`:布尔值,`true`表示返回的值应该尽可能精确,默认值为`false`.默认情况下,设备通常会选择最快,最省电的方式返回坐标.在`true`时,则会使用设备的GPS确定设备位置,并返回与其他方式获取值的混合效果,这种方式更加耗时耗电.
+- `timeout`:毫秒,表示在以`TIMEOUT`状态调用错误回调函数之前等待的最长时间.默认值是`0xFFFFFFFF`.`0`表示完全跳过系统调用而立即以`TIMEOUT`调用错误回调函数.
+- `maximunAge`:毫秒,表示返回坐标的最长有效期,默认值为`0`.因为查询设备位置会消耗资源,所以系统通常会缓存坐标并在下次返回缓存的值(遵从位置缓存失效策略).系统会计算缓存期,如果`Geolocation API`请求的配置要求比缓存的结果更新,则系统才会重新查询并返回值.`0`表示强制系统忽略缓存的值,每次都重新查询.`Infinity`会阻止系统重新查询,只会返回缓存的值.JS通过检查`Position`对象的`timestamp`属性是否重复来判断返回的是否是缓存值.
+
+#### Connection State和NetworkInformation API
+浏览器会跟踪网络连接状态并以两种方式暴露这些信息:连接事件和`navigator.onLine`属性.在设备连接网络时,浏览器会记录并在`window`对象上触发`online`事件,断开连接会在`window`对象上触发`offline`事件.任何时候,都可以通过`navigator.onLine`属性来确定浏览器的联网状态.这个属性返回一个布尔值,表示浏览器是否联网(由浏览器与系统定义,有些连接到局域网就算"在线",即使没有连接到互联网).
+
+`navigator.connection`返回暴露了`NetworkInformation API`的对象,这个API提供了一些只读属性,并为连接属性变化事件处理程序定义了一个事件对象:
+- `downlink`:整数,表示当前设备的带宽(以`Mbit/s`为单位),舍入到最接近的`25kbit/s`.
+- `downlinkMax`:整数,表示当前设备最大的下行带宽(以`Mbit/s`为单位),根据网络的第一跳来确定.
+- `effectiveType`:字符串枚举值,表示连接速度和质量.这些值对应不同的蜂窝数据网络连接技术,但也用于分类无线网络.这个值有以下4种可能:
+  - `slow-2g`:往返时间不小于`2000ms`,下行带宽小于`50kbit/s`.
+  - `2g`:往返时间小于`2000ms`但不小于`1400ms`,下行带宽小于`70kbit/s`但不小于`50kbit/s`.
+  - `3g`:往返时间小于`1400ms`但不小于`270ms`,下行带宽小于`700kbit/s`但不小于`70kbit/s`.
+  - `4g`:往返时间小于`270ms`,下行带宽不小于`700kbit/s`.
+- `rrt`:毫秒,表示当前网络实际的往返时间,舍入为最接近的25毫秒.
+- `type`:字符串枚举值,表示网络连接技术.这个值可能为下列值之一:
+  - `bluetooth`:蓝牙.
+  - `cellular`:蜂窝.
+  - `ethernet`:以太网.
+  - `none`:无网络连接.相当于`navigator.onLine === false`.
+  - `mixed`:多种网络混合.
+  - `other`:其他.
+  - `unknown`:不确定.
+  - `wifi`:Wi-Fi.
+  - `wimax`:WiMAX.
+- `saveData`:布尔值,表示用户设备是否启用了"节流"模式.
+- `onchange`:事件处理程序,会在任何连接状态变化时激发一个`change`事件.可以通过`navigator.connection.addEventListener('change',changeHandler)`或`navigator.connection.onchange = changeHandler`等方式使用.
+
+#### Battery Status API
+浏览器可以访问设备电池及充电状态的信息.`navigator.getBattery()`方法会返回一个期约实例,解决为一个`BatteryManager`对象.
+````JS
+navigator.getBattery().then((b) => console.log(b));
+// BatteryManager { ... }
+````
+
+`BatteryManager`包含4个只读属性,提供设备电池的相关信息:
+- `charging`:布尔值,表示设备当前是否正接入电源充电.如果设备没有电池,则返回`true`.
+- `chargingTime`:整数,表示预计离电池充满还有多少秒.如果电池已充满或设备没有电池,则返回`0`.
+- `dischargingTime`:整数,表示预计离电池耗尽还有多少秒.如果设备没有电池或正在充电,则返回`Infinity`.
+- `level`:浮点数,表示电量百分比.电量完全耗尽返回`0.0`,电池充满返回`1.0`.如果设备没有电池,则返回`1.0`.
+
+这个API还提供了4个事件属性,可用于设置在相应的电池事件发生时调用的回调函数.可以通过给`BatteryManager`添加事件监听器,也可以通过给事件属性赋值来使用这些属性:
+- `onchargingchange`:充电状态变化时.
+- `onchargingtimechange`:充电时间变化时.
+- `ondischargingtimechange`:放电时间变化时.
+- `onlevelchange`:电量百分比变化时.
+
+### 硬件
+浏览器检测硬件的能力相当有限.
+
+- `navigator.handwareConcurrency`属性返回浏览器支持的逻辑处理器核心数量,包含表示核心数的一个整数值(如果核心数无法确定,这个值就是`1`).这个值表示浏览器可以并行执行的最大工作线程数量,不一定是实际的CPU核心数.
+- `navigator.deviceMemory`属性返回设备大致的系统内存大小,包含单位为`GB`的浮点数(舍入为最接近的`2`的幂:512MB->0.5,4GB->4).
+- `navigator.maxTouchPoints`属性返回触摸屏支持的最大关联触点数量,包含一个整数值.
+
+# DOM
 
