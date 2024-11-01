@@ -478,6 +478,19 @@
       - [Battery Status API](#battery-status-api)
     - [硬件](#硬件)
 - [DOM](#dom-1)
+  - [节点层级](#节点层级)
+    - [Node类型](#node类型)
+      - [nodeName于nodeValue](#nodename于nodevalue)
+      - [节点关系](#节点关系)
+      - [操纵节点](#操纵节点)
+      - [其他方法](#其他方法-1)
+    - [Document类型](#document类型)
+      - [文档子节点](#文档子节点)
+      - [文档信息](#文档信息)
+      - [定位元素](#定位元素)
+      - [特殊集合](#特殊集合)
+      - [DOM兼容性检测](#dom兼容性检测)
+      - [文档写入](#文档写入)
 
 # 认识JavaScript
 `JavaScript`包含: 核心(ECMAScript), 文档对象模型(DOM), 浏览器对象模型(BOM).
@@ -10420,4 +10433,291 @@ navigator.getBattery().then((b) => console.log(b));
 - `navigator.maxTouchPoints`属性返回触摸屏支持的最大关联触点数量,包含一个整数值.
 
 # DOM
+文档对象模型是`HTML`和`XML`文档的编程接口.`DOM`表示由多个节点构成的文档,通过它开发者可以添加,删除和修改页面的各个部分.`DOM`是跨平台,语言无关的表示和操作页面的方法.
+
+`JS`中提供了`DOM API`并且它与浏览器中的`HTML`网页相关.
+
+*注:IE8以下的DOM是由COM对象实现的,因此与原生的JS对象会有不同的行为和功能.*
+
+## 节点层级
+任何HTML和XML都可以用DOM表示为一个由节点构成的层级结构.  
+例如:
+````HTML
+<html>
+    <head>
+        <title>Sample Page</title>
+    </head>
+    <body>
+        <p>Hello World!</p>
+    </body>
+</html>
+````
+
+其DOM层级结构可以表示为:
+```
+Document
+ └-Element (html)
+    ├-Element (head)
+    |  └-Element (title)
+    |     └-Text (Sample Page)
+    └-Element (body)
+       └-Element (p)
+          └-Text (Hello world!)
+```
+上例中,`document`节点表示每个文档的根节点(文档节点).根节点的唯一子节点是`<html>`元素,叫做`文档元素`.文档元素是文档最外层的元素,所有其他元素都存在于这个元素之内.每个文档只能有**一个文档元素**.在HTML页面中,文档元素始终是`<html>`元素(`<!DOCTYPE>`不属于文档元素,即使它也处于最外层且属于`document`子节点).在XML中,则没有这样的预定义元素.
+
+`HTML`中的每段标记都可以表示为这个属性结构中的一个节点.元素节点表示HTML元素,属性节点表示属性,文档类型节点表示文档类型,注释节点表示注释.`DOM`中总共有12种节点类型,这些类型都继承一种基本类型.
+
+### Node类型
+`DOM Level 1`描述了名为`Node`的接口,所有DOM节点类型都必须实现这个接口.`Node`接口在JS中实现为`Node`类型.`IE`除外的所有浏览器都可以直接访问这个类型.JS中,所有节点类型都继承`Node`类型,因此所有类型都共享相同的基本属性和方法.
+
+每个节点都有`nodeType`属性,表示该节点的类型,其通过定义在`Node`类型上的12个数值常量表示:
+- `Node.ELEMENT_NODE`(1)
+- `Node.ATTRIBUTE_NODE`(2)
+- `Node.TEXT_NODE`(3)
+- `Node.CDATA_SECTION_NODE`(4)
+- `Node.ENTITY_REFERENCE_NODE`(5)
+- `Node.ENTITY_NODE`(6)
+- `Node.PROCESSING_INSTRUCTION_NODE`(7)
+- `Node.COMMENT_NODE`(8)
+- `Node.DOCUMENT_NODE`(9)
+- `Node.DOCUMENT_TYPE_NODE`(10)
+- `Node.DOCUMENT_FRAGMENT_NODE`(11)
+- `Node.NOTATION_NODE`(12)
+
+例如:
+````JS
+if (someNode.nodetype == Node.ELEMENT_NODE) {
+    console.log("Node is an element.");
+}
+````
+
+浏览器并不支持所有节点类型.
+
+#### nodeName于nodeValue
+`nodeName`和`nodeValue`保存着有关节点的信息.这两个属性的值完全取决于节点类型,因此最好事先检测节点类型.
+
+#### 节点关系
+文档中的所有节点都与其他节点有关系.
+
+每个节点都有一个`childNodes`属性,其中包含一个`NodeList`的实例,存放了其所有的子节点(DOM树).
+
+`NodeList`是一个类数组对象,用于存储可以按位置存取的有序节点.它可以用中括号访问下标,也有`length`属性.`NodeList`独特在于,DOM结构的变化会自动地在`NodeList`中反映出来,所以它是实时的活动对象.
+
+例如:
+````JS
+let firstChild = someNode.childNodes[0];
+let secondChild = someNode.childNodes.item(1);
+let count = someNode.childNodes.length;
+````
+
+使用中括号和使用`item()`方法是等价的.`length`返回的值不会随DOM结构变化而变化,因为它是原始值.
+
+使用`Array.prototype.slice()`,`Array.from()`等方法可以将`NodeList`转换为数组:
+````JS
+let arr1 = Array.prototype.slice.call(someNode.childNodes, 0);
+let arr2 = Array.from(someNode.childNodes);
+````
+
+每个节点都有一个`parentNode`属性,指向其DOM树中的父元素.`childNodes`中的所有节点都指向同一个父元素(节点).`childNodes`列表中的每一个节点都是同一个列表中其他节点的同胞节点.`previousSibling`和`nextSibling`分别指向前驱和后继的同胞节点.列表中第一个节点的`previousSibling`为`null`,最后一个节点的`nextSibling`为`null`.
+
+`firstChild`和`lastChild`分别指向`childNodes`中的第一个和最后一个子节点.如果`childNodes`内没有节点,则这两个属性都是`null`.
+
+`hasChildNodes()`方法返回布尔值,表示是否存在子节点.
+
+`ownerDocument`属性指向代表整个文档的文档节点的指针.所有节点都被创建它们(或自己所在)的文档所拥有.
+
+![节点关系](img/get_start/node_relationship.jpg)
+
+*注:不是所有节点都存在子节点的概念*
+
+#### 操纵节点
+所有关系指针都是只读的.但DOM提供了操纵节点的方法.
+
+`appendChild()`用于在`childNodes`列表末尾添加节点(作为唯一的参数).添加新节点会更新相关的关系指针.该方法返回新添加的节点.**一个节点不会在文档中同时出现在两个或更多个地方.因此,传入文档中已经存在的节点会将节点移动到该位置.**对于此函数,会移动为最后一个子节点.
+````JS
+let returnedNode = someNode.appendChild(newNode);
+console.log(returnedNode == newNode);       // true
+console.log(someNode.lastChild == newNode); // true
+returnedNode = someNode.appendChild(someNode.firstChild);
+console.log(returnedNode == someNode.firstChild);   // false
+console.log(returnedNode == someNode.lastChild);    // true
+````
+
+使用`insertBefore()`方法将节点插入到`childNodes`的特定位置.该方法接收两个参数:要插入的节点和参照节点.调用这个方法后,要插入的节点会变成参照节点的前一个同胞节点.如果参照节点是`null`,则`insertBefore()`的效果同`appendChild()`.该方法返回插入的节点.
+
+`replaceChild()`方法接收两个参数:要插入的节点和要替换的节点.要替换的节点会被返回并从文档中完全移除,要插入的节点会取而代之.但从技术上来讲,被移除的节点仍然被同一个文档所拥有,即使文档中已经没有它的位置.
+
+`removeChild()`接收一个参数,表示要移除的节点.被移除的节点会被返回.被移除的节点仍然被同一个文档所拥有,即使文档中已经没有它的位置.
+
+对于不支持子节点的节点上调用上述方法,会导致抛出错误.
+
+#### 其他方法
+`cloneNode()`返回与调用它的节点一模一样但不是同一实例的节点.该方法接收一个布尔值参数,如果传入的是`true`,则会复制节点及其子DOM树.如果传入`false`,则只会复制节点本身.返回的节点属于文档所有,但尚未指定父节点,所以可称为孤儿节点(orphan).
+
+例如:
+````HTML
+<ul>
+    <li>item 1</li>
+    <li>item 2</li>
+    <li>item 3</li>
+</ul>
+````
+对上述HTML片段使用`cloneNode()`:
+````JS
+let deepList = myList.cloneNode(true);
+console.log(deepList.childNodes.length);    // 3 (IE9之前的版本) 或 7 (其他浏览器)
+let shallowList = myList.cloneNode(false);
+console.log(shallowList.childNodes.length); // 0
+````
+
+*注意:`cloneNode()`方法不会复制添加到DOM节点的JS属性,比如事件处理程序.这个方法只复制HTML属性以及可选的复制子节点,除此以外一概不会复制.IE在很长时间内会复制事件处理程序,这是一个bug.*
+
+`normalize()`用于处理文档子树中的文本节点.它会检测这个节点的所有后代,从中搜索上述两种情形.如果发现空文本节点,则将其删除;如果两个同胞节点是相邻的,则将其合并为一个文本节点.*见下文*
+
+### Document类型
+`Document`类型是JS中表示文档节点的类型.在浏览器中,文档对象`document`是`HTMLDocument`的实例(`HTMLDocument`继承`Document`),表示整个HTML页面.`document`是`window`对象的属性,因此是一个全局对象.`Document`类型的节点有以下特征:
+- `nodeType`等于`9`(`Node.DOCUMENT_NODE`)
+- `nodeName`值为`#document`
+- `nodeValue`值为`null`
+- `parentNode`值为`null`
+- `ownerDocument`值为`null`
+- 子节点可以是`DocumentType`(最多一个),`Element`(最多一个),`ProcessingInstruction`或`Comment`类型.
+
+`Document`类型可以表示`HTML`页面或其他`XML`文档,但最常用的还是通过`HTMLDocument`的实例取得`document`对象.
+
+#### 文档子节点
+`Document`提供了几个访问子节点(不一定是直接子节点)的快捷方式.
+
+(这里使用`document`对象,但是`Document`类型的实例对象也可以使用)  
+`document.documentElement`属性始终指向`HTML`页面中的`<html>`元素.
+
+`document.body`属性始终指向`<body>`元素.
+
+`document.doctype`用于访问`<!doctype>`标签(属于`DocumentType`).
+
+出现在`<html>`元素外面的注释也是文档的子节点,它们的类型是`Comment`.不过,针对不同的浏览器,这些注释可能会不被识别.
+
+一般来说,`appendChild()`,`removeChild()`和`replaceChild()`方法一般不会用在`document`对象上.因为文档类型是只读的,而且只能有一个`Element`类型的子节点.
+
+#### 文档信息
+`HTMLDocument`上还增加了一些属性.
+
+`title`属性指向`<title>`元素中的文本(不是标签本身).
+````JS
+// 读取文档标题
+let originalTitle = document.title;
+// 修改文档标题
+document.title = "New page title"
+````
+
+`URL`属性包含当前页面的完整URL.`domain`属性包含页面的域名.`referrer`属性包含链接到当前页面的那个页面的URL,如果当前页面没有来源,则`referrer`属性包含空字符串.所有这些信息都可以在请求的HTTP头部信息中获取,只是JS中通过这几个属性暴露出来而已.
+
+例如:
+````JS
+// 当前URL为https://www.example.com/page/
+console.log(document.URL);  // https://www.example.com/page/
+console.log(document.domain);   // www.example.com
+console.log(document.referrer); // <从哪个网站导航到这个网站的>
+````
+
+只有`domain`属性是可以设置的,但条件是页面只能放松,不能收紧,不能重定义向其他服务器:
+```
+p2p.example.com -> example.com  // OK
+www.example.com -> example.com  // OK
+example.com -> p2p.example.com  // Error
+www.example.com -> p2p.example.com  // Error
+example.com -> anothersite.com  // Error
+```
+
+这可以用于对不同子域的窗格(`<frame>`)或内嵌窗格(`<iframe>`)(用于在网页中嵌套其他网页),使用`domain`将每个页面设置为相同的域,多个子域之间就可以通信了.
+
+#### 定位元素
+`Document`上的方法`getElementById()`接收一个参数,即要获取元素的ID,如果找到了则返回这个元素,如果没找到则返回`null`,区分大小写.
+
+例如:
+````HTML
+<div id="myDiv">Some text</div>
+````
+可以使用:
+````JS
+let div = document.getElementId("myDiv");   // 取得对这个<div>元素的引用
+let div2 = document.getElementId("mydiv");  // null
+````
+
+如果页面中存在多个具有相同ID的元素,则`getElementById()`返回文档中出现的第一个元素.
+
+`Document`上的方法`getElementsByTagName()`接收一个参数,即要获取元素的标签名,返回包含0个或多个元素的`NodeList`.在`HTML`文档中(使用`HTMLDocument`实例),这个方法返回一个`HTMLCollection`对象.两者很相似,都是"实时"列表.
+
+````JS
+let images = document.getElementsByTagName("img");  // 取得包含所有<img>元素的HTMLCollection
+````
+
+`HTMLCollection`可以使用中括号或者`item()`方法索引,也可以用`length`属性获取元素数量.
+
+其上还有一个额外的方法`namedItem()`,可通过标签的`name`属性取得某一项的引用.
+````HTML
+<img src="myimage.jpg" name="myImage">
+````
+则可以使用以下方法获取对这个`<img>`元素的引用:
+````JS
+let images = document.getElementsByTagName("img");
+let myImage = images.namedItem("myImage");
+````
+使用中括号接收字符串索引的方式也可以与`namedItem()`方法等价:`images["myImage"]`.
+
+给`getElementsByTagName()`传入`"*"`可以取得文档中的所有元素:
+````JS
+let allElements = document.getElementsByTagName("*");   // 返回包含页面中所有元素的HTMLCollection对象,顺序是它们在页面中出现的顺序.因此第一项是<html>元素
+````
+
+*注意:虽然规范要求`getElementsByTagName()`区分标签的大小写,但为了最大限度兼容原有HTML页面,实际上是不区分大小写的.如果是在`XML`页面(例如`XHTML`)中使用,那么`getElementsByTagName()`就是区分大小写的.*
+
+`HTMLDocument`类型上还定义了`getElementsByName()`方法,这个方法会返回具有给定`name`属性的所有元素.该方法最常用于单选按钮,因为同一字段的单选按钮必须具有相同的`name`属性才能确保把正确的值发送给服务器:
+````HTML
+<fieldset>
+    <legend>Which color do you prefer?</legend>
+    <ul>
+        <li>
+            <input type="radio" value="red" name="color" id="colorRed">
+            <label for="colorRed">Red</label>
+        </li>
+        <li>
+            <input type="radio" value="green" name="color" id="colorGreen">
+            <label for="colorGreen">Green</label>
+        </li>
+        <li>
+            <input type="radio" value="blue" name="color" id="colorBlue">
+            <label for="colorBlue">Blue</label>
+        </li>
+    </ul>
+</fieldset>
+````
+上例中所有单选按钮都有名为`"color"`的`name`属性,但它们的ID都不一样.这是因为ID是为了匹配相应的`<label>`元素,而`name`相同时为了保证只将三个中的一个值发送给服务器.  
+可以通过下面的方法取得所有单选按钮:
+````JS
+let radios = document.getElementsByName("color");
+````
+
+`getElementsByName()`方法返回`HTMLCollection`.不过在这种情况下,`namedItem()`方法只会取得第一项(因为所有项的`name`属性都一样).
+
+#### 特殊集合
+`HTMLDocument`的实例对象上还暴露了几个特殊属性,它们是`HTMLCollection`的实例:
+- `document.anchors`:包含文档中所有带`name`属性的`<a>`元素.
+- `document.applets`*(已废弃)*:包含文档中所有`<applet>`*(已废弃)*元素.
+- `document.forms`:包含文档中所有`<form>`元素(与`document.getElementsByTagName("form")`返回结果相同).
+- `document.images`:包含文档中所有`<img>`元素(与`document.getElementsByTagName("img")`返回结果相同).
+- `document.links`:包含文档中所有带`href`属性的`<a>`元素.
+
+上述属性的内容也会实时更新以符合当前文档的内容.
+
+#### DOM兼容性检测
+
+> **<b class="red_font">已弃用,请不要在新的网站中使用</b>**
+
+`DOM`有多个Level和多个部分,因此确定浏览器实现了DOM的那些部分是很必要的.
+
+`document.implementation`上定义了一个方法,即`hasFeature()`(已弃用),这个方法接收两个参数:特性名称和DOM版本.如果浏览器支持指定的特性和版本,则`hasFeature()`方法返回`true`:`let hasXmlDom = document.implementation.hasFeature("XML", "1.0")`;
+
+#### 文档写入
 
