@@ -491,6 +491,18 @@
       - [特殊集合](#特殊集合)
       - [DOM兼容性检测](#dom兼容性检测)
       - [文档写入](#文档写入)
+    - [Element类型](#element类型)
+      - [HTML元素](#html元素)
+      - [取得属性](#取得属性)
+      - [设置属性](#设置属性)
+      - [attributes属性](#attributes属性)
+      - [创建元素](#创建元素)
+      - [元素后代](#元素后代)
+    - [Text类型](#text类型)
+      - [创建文本节点](#创建文本节点)
+      - [规范化文本节点](#规范化文本节点)
+      - [拆分文本节点](#拆分文本节点)
+    - [Comment类型](#comment类型)
 
 # 认识JavaScript
 `JavaScript`包含: 核心(ECMAScript), 文档对象模型(DOM), 浏览器对象模型(BOM).
@@ -10720,4 +10732,347 @@ let radios = document.getElementsByName("color");
 `document.implementation`上定义了一个方法,即`hasFeature()`(已弃用),这个方法接收两个参数:特性名称和DOM版本.如果浏览器支持指定的特性和版本,则`hasFeature()`方法返回`true`:`let hasXmlDom = document.implementation.hasFeature("XML", "1.0")`;
 
 #### 文档写入
+`Document`类型的对象有4个方法:`write()`,`writeln()`,`open()`,`close()`.
+
+**<p class="yellow_font">注意:强烈不建议使用`write()`和`writeln()`方法.XHTML文档也不支持文档写入.对于内容类型为`application/xml+xhtml`的页面,这些方法不起作用.</p>**
+
+`write()`和`writeln()`方法都接收一个字符串参数,可以将这个字符串写入网页中.`write()`简单地写入文本,而`writeln()`会在字符串末尾追加一个换行符(`\n`).
+
+例如:
+````HTML
+<html>
+<head>
+    <title>example<title>
+</head>
+<body>
+    <script type="text/javascript">
+        document.write("<script type=\"text/javascript\" src=\"test.js\">" + "<\/script>"); // 不能直接写成/script,因为这会导致被解析为脚本块的结尾.
+        // 此文字会写在该JS脚本的后面
+    </script>
+</body>
+</html>
+````
+如果是在页面加载结束之后用`write()`向文档输出内容,则输出内容会重写整个页面(整个HTML的内容都变成了`write()`的字符串参数值).
+````JS
+window.onload = function() {
+    document.write("Hello world");
+};
+````
+
+`open()`和`close()`方法用于打开和关闭网页输出流.在调用`write()`和`writeln()`时,这两个方法都不是必需的.
+
+### Element类型
+`Element`类型表示`XML`或`HTML`元素,对外暴露出访问元素标签名,子节点和属性的能力.其特征如下:
+- `nodeType`等于`1`(`Node.ELEMENT_NODE`)
+- `nodeName`值为元素的标签名
+- `nodeValue`值为`null`
+- `parentNode`值为`Document`或`Element`对象
+- 子节点可以是`Element`,`Text`,`Comment`,`ProcessingInstruction`,`CDATASection`,`EntityReference`类型.
+
+使用`nodeName`或`tagName`属性来获取元素的标签名,这两个属性的返回值相同:
+````HTML
+<div id="myDiv"></div>
+````
+````JS
+let div = document.getElementById("myDiv");
+console.log(div.tagName);   // DIV
+console.log(div.tagName === div.nodeName);  // true
+````
+
+在HTML中,元素标签名始终以全大写表示,在XML(包括XHTML)中,标签名始终与源代码的大小写一致.因此,最好将标签名转换为小写形式,以便于比较:
+````JS
+if (element.tagName.toLowerCase() == "div") {   // 推荐
+    // do something
+}
+````
+
+#### HTML元素
+所有HTML元素都通过`HTMLElement`类型(直接继承自`Element`)标识,包括其直接实例或间接实例.
+
+所有`HTMLElement`都有以下属性:
+- `id`:id属性
+- `title`:title属性
+- `lang`:lang属性
+- `dir`:dir属性
+- `className`:class属性
+
+例如:
+````HTML
+<div id="myDiv" class="bd" title="Body text" lang="en" dir="ltr"></div>
+````
+可以使用JS代码读取或修改上述元素的属性:
+````JS
+let div = document.getElementById("myDiv");
+console.log(div.id);        // myDiv
+console.log(div.className); // bd
+console.log(div.title);     // Body text
+console.log(div.lang);      // en
+console.log(div.dir);       // ltr
+div.id = "someOtherId";     // 可以修改,会实时更新
+````
+
+所有HTML元素都是`HTMLElement`或其子类型的实例,以下是所有HTML元素及其对应的类型(删除线表示已经废弃的元素):
+- `元素(小写表示)`:`类型`
+- `a`:`HTMLAnchorElement`
+- `abbr`:`HTMLElement`
+- <s>`acronym`:`HTMLElement`</s>
+- <s>`applet`:`HTMLAppletElement`</s>
+- `area`:`HTMLAreaElement`
+- `b`:`HTMLElement`
+- `base`:`HTMLBaseElement`
+- <s>`basefont`:`HTMLBaseFontElement`</s>
+- `bdo`:`HTMLElement`
+- <s>`big`:`HTMLElement`</s>
+- `blockquote`:`HTMLQuoteElement`
+- `body`:`HTMLBodyElement`
+- `br`:`HTMLBRElement`
+- `button`:`HTMLButtonElement`
+- `caption`:`HTMLTableCaptionElement`
+- <s>`center`:`HTMLElement`</s>
+- `cite`:`HTMLElement`
+- `code`:`HTMLElement`
+- `col`:`HTMLTableColElement`
+- `colgroup`:`HTMLTableColElement`
+- `dd`:`HTMLElement`
+- `del`:`HTMLModElement`
+- `dfn`:`HTMLElement`
+- <s>`dir`:`HTMLDirectoryElement`</s>
+- `div`:`HTMLDivElement`
+- `dl`:`HTMLDListElement`
+- `dt`:`HTMLElement`
+- `em`:`HTMLElement`
+- `fieldset`:`HTMLFieldSetElement`
+- <s>`font`:`HTMLFontElement`</s>
+- `form`:`HTMLFormElement`
+- <s>`frame`:`HTMLFrameElement`</s>
+- <s>`frameset`:`HTMLFrameSetElement`</s>
+- `h1`:`HTMLHeadingElement`
+- `h2`:`HTMLHeadingElement`
+- `h3`:`HTMLHeadingElement`
+- `h4`:`HTMLHeadingElement`
+- `h5`:`HTMLHeadingElement`
+- `h6`:`HTMLHeadingElement`
+- `head`:`HTMLHeadElement`
+- `hr`:`HTMLHRElement`
+- `html`:`HTMLHtmlElement`
+- `i`:`HTMLElement`
+- `iframe`:`HTMLIFrameElement`
+- `img`:`HTMLImageElement`
+- `imput`:`HTMLInputElement`
+- `ins`:`HTMLModElement`
+- <s>`isindex`:`HTMLIsIndexElement`</s>
+- `kbd`:`HTMLElement`
+- `label`:`HTMLLabelElement`
+- `legend`:`HTMLLegendElement`
+- `li`:`HTMLLIElement`
+- `link`:`HTMLLinkElement`
+- `map`:`HTMLMapElement`
+- <s>`menu`:`HTMLMenuElement`</s>
+- `meta`:`HTMLMetaElement`
+- <s>`noframes`:`HTMLElement`</s>
+- `noscript`:`HTMLElement`
+- `object`:`HTMLObjectElement`
+- `ol`:`HTMLOListElement`
+- `optgroup`:`HTMLOptGroupElement`
+- `option`:`HTMLOptionElement`
+- `p`:`HTMLParagraphElement`
+- <s>`param`:`HTMLParamElement`</s>
+- `pre`:`HTMLPreElement`
+- `q`:`HTMLQuoteElement`
+- `s`:`HTMLElement`
+- `samp`:`HTMLElement`
+- `script`:`HTMLScriptElement`
+- `select`:`HTMLSelectElement`
+- `small`:`HTMLElement`
+- `span`:`HTMLElement`
+- <s>`strike`:`HTMLElement`</s>
+- `strong`:`HTMLElement`
+- `style`:`HTMLStyleElement`
+- `sub`:`HTMLElement`
+- `sup`:`HTMLElement`
+- `table`:`HTMLTableElement`
+- `tbody`:`HTMLTableSectionElement`
+- `td`:`HTMLTableCellElement`
+- `textarea`:`HTMLTextAreaElement`
+- `tfoot`:`HTMLTableSectionElement`
+- `th`:`HTMLTableSectionElement`
+- `thead`:`HTMLTableSectionElement`
+- `title`:`HTMLTitleElement`
+- `tr`:`HTMLTableRowElement`
+- <s>`tt`:`HTMLElement`</s>
+- `u`:`HTMLElement`
+- `ul`:`HTMLUListElement`
+- `var`:`HTMLElement`
+
+#### 取得属性
+与属性相关的DOM方法有三个`getAttribute()`,`setAttribute()`,`removeAttribute()`.
+
+`getAttribute()`方法接收一个字符串,表示要获取的属性的.属性名不区分大小写,如果给定的属性不存在,则`getAttribute()`返回`null`.`HTML`中的布尔属性如果其后没有值,则返回`""`.获取的属性不一定要求是HTML属性.
+````HTML
+<div id="myDiv" class="myClass" not_html_attribute="hello world" html_boolean_attribute></div>
+````
+````JS
+let div = document.getElementById("myDiv");
+console.log(div.getAttribute("cLAss"));                     // "myClass"
+console.log(div.getAttribute("not_html_attribute"));        // "hello world"
+console.log(div.getAttribute("html_boolean_attribute"));    // ""
+console.log(div.getAttribute("not_exsit"));                 // null
+````
+
+***HTML5规范要求,自定义属性名应该前缀为`data-`以方便验证.***
+
+元素的公认(非自定义)属性也会被添加到DOM对象的属性.
+
+通过DOM对象访问的属性中,有两个属性与`getAttribute()`的返回值不一样:
+- `style`属性:对于`getAttribute()`返回CSS字符串;对于DOM对象属性返回`CSSStyleDeclaration`对象.
+- 事件处理程序(事件属性,这种属性的值是一段JS代码):对于`getAttribute()`返回字符串形式的源代码;对于DOM对象属性返回JS函数(未指定该属性则返回`null`).
+
+因此,通常使用DOM对象属性而非`getAttribute()`(自定义属性除外).
+
+#### 设置属性
+`setAttribute()`用于给属性设置(或替换)属性值.该方法接收两个参数:要设置的属性名和属性的值.第一个参数传入的字符串会自动转换为小写形式.
+
+直接给DOM对象属性赋值与`setAttribute()`是等价的:
+````JS
+let div = document.getElementById("myDiv");
+div.setAttribute("Id", "someOtherId");  // 等价于div.id = "someOtherId";
+div.setAttribute("cLass", "myClass");   // 等价于div.className = "myClass";
+div.setAttribute("title", "aaa");       // 等价于div.title = "aaa";
+````
+
+但在DOM上添加自定义属性,不会自动让它变成元素的属性.
+
+`removeAttribute()`用于从元素中删除属性:
+````JS
+div.removeAttribute("class");
+````
+
+#### attributes属性
+`Element`类型是唯一使用`attributes`属性的DOM节点类型.`attributes`属性包含一个`NamedNodeMap`实例,是一个"实时"集合.元素的每个属性都表示为一个`Attr`节点,并保存在这个`NamedNodeMap`对象中.
+
+`NamedNodeMap`对象包含下列方法:
+- `getNamedItem(name)`:返回`nodeName`属性等于`name`的节点
+- `removeNamedItem(name)`:删除`nodeName`属性等于`name`的节点
+- `setNamedItem(name)`:向列表中添加`node`节点,以其`nodeName`为索引
+- `item(pos)`:返回索引位置`pos`处的节点
+
+`attributes`属性中的每个节点的`nodeName`是对应属性的名字,`nodeValue`是属性的值:
+````JS
+let id = element.attributes.getNamedItem("id").nodeValue;   // 获取属性id的属性值
+````
+也可以使用中括号访问来简写:
+````JS
+let id = element.attributes["id"].nodeValue;
+element.attributes["id"].nodeValue = "someOtherId";
+````
+
+`removedNamedItem()`方法与元素上的`removeAttribute()`方法类似.
+
+`setNamedItem()`接收一个[属性节点](https://developer.mozilla.org/zh-CN/docs/Web/API/Attr),然后给元素添加一个新属性:
+````JS
+element.attributes.setNamedItem(newAttr);   // newAttr是Attr类型的
+````
+
+`attributes`属性一般用于迭代元素上的所有属性,这可以用于将DOM结构序列化为XML或HTML字符串.迭代顺序取决于浏览器实现.
+
+#### 创建元素
+使用`document.createElement()`方法创建新元素并将其`ownerDocument`属性设置为`document`(即使它不存在于DOM树中).这个方法接收一个参数,即要创建元素的标签名.`HTML`中,标签名不区分大小写,`XML`(包括`XHTML`)中是区分大小写的.该方法返回对元素节点的引用:
+````JS
+let div = document.createElement("div");    // 此时`ownerDocument`已经是`document`
+div.id = "myNewDiv";
+div.className = "box";
+document.body.appendChild(div);
+````
+
+#### 元素后代
+`childNodes`属性包含元素所有的子节点:其他元素,文本节点,注释或处理指令.
+
+对于:
+````HTML
+<ul id="myList">
+    <li>Item 1</li>
+    <li>Item 2</li>
+    <li>Item 3</li>
+</ul>
+````
+`<ul>`元素会包含7个子元素,其中3个是`<li>`元素,还有4个`Text`节点(表示`<li>`元素周围的空白符(换行符,制表符)).(不同浏览器可能会有所不同,例如:认为只包含3个子元素)
+
+若为:
+````HTML
+<ul id="myList"><li>Item 1</li><li>Item 2</li><li>Item 3</li></ul>
+````
+此时`<ul>`元素会包含3个子元素.
+
+对某个元素调用[定位元素](定位元素)中提及的方法,则只会在子节点中搜索:
+````JS
+let ul = document.getElementById("myList");
+let items = ul.getElementsByTagName("li");
+````
+
+### Text类型
+`Text`节点由`Text`类型表示,包含按字面解释的纯文本,也可能包含转义后的HTML字符,但不含HTML代码.`Text`类型的节点具有以下特征:
+- `nodeType`为`3`(`Node.TEXT_NODE`)
+- `nodeName`值为`#text`
+- `nodeValue`值为节点中包含的文本
+- `parentNode`值为`Element`对象
+- 不支持子节点
+
+`Text`节点中包含的文本可以通过`nodeValue`属性访问,也可以通过`data`属性访问,这两个属性包含相同的值.修改`nodeValue`或`data`的值,也会在另一个属性反映出来.文本节点暴露了以下操作文本的方法:
+- `appendData(text)`:向节点末尾添加文本`text`
+- `deleteData(offset, count)`:从位置`offset`开始删除`count`个字符
+- `insertData(offset, text)`:在位置`offset`插入`text`.
+- `replaceData(offset, count, text)`:用`text`替换从位置`offset`到`offset+count`的文本.
+- `splitText(offset)`:在位置`offset`将当前文本节点拆分为两个文本节点
+- `substringData(offset, count)`:提取从位置`offset`到`offset+count`的文本
+- `length`:该属性获取文本节点中包含的字符数量.这个值等于`nodeValue.length`和`data.length`.
+
+默认情况下,包含文本内容的每个元素最多只能有一个文本节点:
+````HTML
+<div></div> <!-- 没有内容,因此没有文本节点 -->
+<div> </div>    <!-- 有空格,因此有一个文本节点 -->
+<div>Hello World!</div> <!-- 有且仅有文本内容,因此有一个文本节点 -->
+````
+
+如果文本中有字符实体,则在JS字符串中会变成正常字符.如果JS字符串中有大小于号,则会自动转换为字符实体(应用HTML或XML编码):
+````JS
+div.firstChild.nodeValue = "Some <strong>other</strong> message";
+// HTML中div元素内的文本为Some &lt;strong&gt;other&lt;/strong&gt; message
+````
+
+#### 创建文本节点
+`document.createTextNode()`可以用来创建新文本节点(其`ownerDocument`属性会被设置为`document`),它接收一个参数,即要插入节点的文本,这些插入的文本也会应用HTML或XML编码.
+````JS
+let element = document.createElement("div");
+element.className = "message";
+let textNode = document.createTextNode("Hello world!");
+element.appendChild(textNode);
+document.body.appendChild(element);
+````
+两个相邻的文本节点不会导致文本之间出现空格.
+
+#### 规范化文本节点
+DOM文档中经常出现两个相邻的文本节点,因此,可以使用`Node`类型中的`normalize()`方法,将子节点中相邻的同胞文本节点合并为一个文本节点,这个文本节点的`nodeValue`就等于之前所有同胞节点`nodeValue`拼接在一起的字符串.
+````JS
+// element的子节点是两个文本节点"Hello "和"world!"
+console.log(element.childNodes.length); // 2
+element.normalize();
+console.log(element.childNodes.length); // 1
+console.log(element.firstChild.nodeValue);  // Hello world!
+````
+
+浏览器解析文档时,永远不会创建同胞文本节点.同胞文本节点只会出现在DOM脚本生成的文档树中.
+
+#### 拆分文本节点
+如上所说,存在`splitText()`方法可用于拆分`nodeValue`:
+````JS
+// element包含一个文本节点"Hello world!"
+let newNode = element.firstChild.splitText(5);
+console.log(element.firstChild.nodeValue);  // "Hello"
+console.log(newNode.nodeValue);             // " world!"
+console.log(element.childNodes.length);     // 2
+````
+
+拆分文本节点常用于从文本节点中提取数据的DOM解析技术.
+
+### Comment类型
 
