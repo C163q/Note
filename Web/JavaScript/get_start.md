@@ -503,6 +503,19 @@
       - [规范化文本节点](#规范化文本节点)
       - [拆分文本节点](#拆分文本节点)
     - [Comment类型](#comment类型)
+    - [CDATASection](#cdatasection)
+    - [DocumentType类型](#documenttype类型)
+    - [DocumentFragment类型](#documentfragment类型)
+    - [Attr类型](#attr类型)
+  - [DOM编程](#dom编程)
+    - [动态脚本](#动态脚本)
+    - [动态样式](#动态样式)
+    - [操作表格](#操作表格)
+    - [使用NodeList](#使用nodelist)
+  - [MutationObserver接口](#mutationobserver接口)
+    - [基本用法](#基本用法-1)
+      - [observe()方法](#observe方法)
+      - [回调与MutationRecord](#回调与mutationrecord)
 
 # 认识JavaScript
 `JavaScript`包含: 核心(ECMAScript), 文档对象模型(DOM), 浏览器对象模型(BOM).
@@ -10585,7 +10598,7 @@ console.log(shallowList.childNodes.length); // 0
 
 *注意:`cloneNode()`方法不会复制添加到DOM节点的JS属性,比如事件处理程序.这个方法只复制HTML属性以及可选的复制子节点,除此以外一概不会复制.IE在很长时间内会复制事件处理程序,这是一个bug.*
 
-`normalize()`用于处理文档子树中的文本节点.它会检测这个节点的所有后代,从中搜索上述两种情形.如果发现空文本节点,则将其删除;如果两个同胞节点是相邻的,则将其合并为一个文本节点.*见下文*
+`normalize()`用于处理文档子树中的文本节点.它会检测这个节点的所有后代,从中搜索上述两种情形.如果发现空文本节点,则将其删除;如果两个同胞节点是相邻的,则将其合并为一个文本节点.[*见下文*](#规范化文本节点)
 
 ### Document类型
 `Document`类型是JS中表示文档节点的类型.在浏览器中,文档对象`document`是`HTMLDocument`的实例(`HTMLDocument`继承`Document`),表示整个HTML页面.`document`是`window`对象的属性,因此是一个全局对象.`Document`类型的节点有以下特征:
@@ -10968,7 +10981,7 @@ element.attributes["id"].nodeValue = "someOtherId";
 
 `removedNamedItem()`方法与元素上的`removeAttribute()`方法类似.
 
-`setNamedItem()`接收一个[属性节点](https://developer.mozilla.org/zh-CN/docs/Web/API/Attr),然后给元素添加一个新属性:
+`setNamedItem()`接收一个[属性节点](#attr类型),然后给元素添加一个新属性:
 ````JS
 element.attributes.setNamedItem(newAttr);   // newAttr是Attr类型的
 ````
@@ -11075,4 +11088,382 @@ console.log(element.childNodes.length);     // 2
 拆分文本节点常用于从文本节点中提取数据的DOM解析技术.
 
 ### Comment类型
+`DOM`中的注释通过`Comment`类型表示.`Comment`类型的节点具有以下特征:
+- `nodeType`等于`8`(`Node.COMMENT_NODE`)
+- `nodeName`值为`"#comment"`
+- `nodeValue`值为注释的内容
+- `parentNode`值为`Document`或`Element`对象
+- 不支持子节点
+
+`Comment`类型与`Text`类型继承同一个基类`CharacterData`,因此拥有除`splitText()`之外`Text`节点所有的字符串操作方法.其注释的实际内容(指的是不包含`<!-- -->`的文字部分)可以通过`nodeValue`或`data`属性获得.
+
+例如:
+````HTML
+<div id="myDiv"><!-- A comment --></div>
+````
+此处的注释是`<div>`元素的子节点,因此可以用如下的代码访问:
+````JS
+let div = document.getElementById("myDiv");
+let comment = div.firstChild;
+console.log(comment.data);  // " A comment "
+````
+
+可以使用`document.createComment()`方法创建注释节点,参数为注释文本(不包括`<!-- -->`).
+
+浏览器不承认`</html>`标签后的注释,因此这部分不会出现在DOM树上.
+
+### CDATASection
+`CDATASection`类型表示`XML`中特有的`CDATA`区块.`CDATASection`类型继承`Text`类型,因此拥有包括`splitText()`在内的所有字符串操作方法.`CDATASection`类型的节点具有以下特征:
+- `nodeType`等于`4`(`Node.CDATA_SECTION_NODE`)
+- `nodeName`值为`#cdata-section`
+- `nodeValue`值为CDATA区块的内容
+- `parentNode`值为`Document`或`Element`对象
+- 不支持子节点
+
+`CDATA`区块只在XML文档中有效.但对于代码:
+````XHTML
+<div id="myDiv"><![CDATA[This is some content.]]></div>
+````
+主流的浏览器都没有将其识别为`CDATASection`.
+
+在真正的XML文档中,可以使用`document.createCDataSection()`并传入节点内容来创建CDATA区块.
+
+### DocumentType类型
+`DocumentType`类型的节点包含文档的类型(`doctype`)信息,具有以下特征:
+- `nodeType`等于`10`(`Node.DOCUMENT_TYPE_NODE`)
+- `nodeName`值为文档类型的名称
+- `nodeValue`值为`null`
+- `parentNode`值为`Document`对象
+- 不支持子节点
+
+`DocumentType`在`DOM Level1`中不支持动态创建.`DocumentType`对象保存在`document.doctype`属性中.  
+`DocumentType`还有几个属性:
+- `name`:文档类型的名称
+- `entities`:文档类型描述的实体的`NamedNodeMap`
+- `notations`:文档类型描述的表示法的`NamedNodeMap`
+
+对于`HTML`和`XHTML`,`entities`和`notations`列表为空.
+
+对于`name`(文档类型名称),是`<!DOCTYPE`后面的那个字符串:
+````HTML
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+  "http://www.w3.org/TR/html4/strict.dtd">
+````
+````JS
+console.log(document.doctype.name); // html
+````
+
+### DocumentFragment类型
+在所有节点类型中,`DocuemntFragment`类型是唯一一个在标记中没有对应表示的类型.`DOM`将文档片段定义为"轻量级"文档,能够包含和操作节点,却没有完整文档那样的额外的消耗.  
+`DocumentFragment`节点具有以下特征:
+- `nodeType`等于`11`(`Node.DOCUMENT_FRAGMENT_NODE`)
+- `nodeName`值为`"#document-fragment"`
+- `nodeValue`值为`null`
+- `parentNode`值为`null`
+- 子节点可以是`Element`,`ProcessingInstruction`,`Comment`,`Text`,`CDATASection`或`EntityReference`.
+
+不能直接把文档片段添加到文档.相反,文档片段的作用是充当其他要被添加到文档的节点的仓库.
+
+可以使用`document.createDocumentFargment()`方法创建文档片段.
+
+文档片段从`Node`类型继承了所有文档类型具备的可以执行DOM操作的方法.
+
+使用例:要将`<ul>`和许多`<li>`元素添加到文档中,为了避免多次渲染,将`<ul>`和`<li>`在文档片段中创建,并将其移到文档中.
+
+
+### Attr类型
+元素数据(属性)在DOM中通过`Attr`类型表示.`Attr`类型的构造函数和原型在所有浏览器中都可以访问.技术上讲,属性是存在于元素`attributes`属性中的节点(而非DOM文档树中).`Attr`节点具有以下特征:
+- `nodeType`等于`2`(`Node.ATTRIBUTE_NODE`)
+- `nodeName`值为属性名
+- `nodeValue`值为属性值
+- `parentNode`值为`null`
+- 在HTML中不支持子节点
+- 在XML中子节点可以是`Text`或`EntityReference`.
+
+属性节点尽管是节点,却不认为是DOM文档树的一部分.`Attr`节点很少直接被引用,而是通常使用`getAttribute()`,`removeAttribute()`和`setAttribute()`方法操作属性.
+
+`Attr`对象上还有几个属性:
+- `name`:属性名(同`nodeName`)
+- `value`:属性值(同`nodeValue`)
+- `specified`:布尔值,表示属性使用的是默认值还是被指定的值.
+
+可以使用`document.createAttribute()`方法创建新的`Attr`节点,参数为属性名:
+````JS
+let attr = document.createAttribute("align");
+attr.value = "left";
+element.setAttributeNode(attr);
+````
+
+元素的`setAttributeNode()`方法传入一个`Attr`节点,以赋值一个属性.元素的`getAttributeNode()`方法返回属性对应的`Attr`节点.
+
+*注:推荐使用`getAttribute()`,`removeAttribute()`和`setAttribute()`方法操作属性,而不是直接操作属性节点,因为将属性作为节点来访问多数情况下并无必要.*
+
+## DOM编程
+### 动态脚本
+动态脚本就是在页面初始加载时不存在,之后又通过DOM包含的脚本.与对应的HTML元素一样,有两种方式通过`<script>`动态为网页添加脚本:引入外部文件和直接插入源代码.
+
+**动态加载外部文件:**
+
+例如要添加这样的节点:
+````HTML
+<script src="foo.js"></script>
+````
+可以这样写:
+````JS
+function loadScript(url) {
+    let script = document.createElement("script");
+    script.src = url;
+    document.body.appendChild(script);
+}
+loadScript("foo.js");
+````
+
+如何确定动态脚本加载完*见下文*.
+
+**直接插入源代码:**
+
+例如要添加这样的节点:
+````HTML
+<script>
+    function sayHi() {
+        console.log("hi");
+    }
+</script>
+````
+可以这样写:
+````JS
+let script = document.createElement("script");
+script.appendChild(document.createTextNode("function sayHi() { console.log('hi'); }"));
+document.body.appendChild(script);
+````
+
+*注:为了兼容IE和Safari 3之前的版本,上述代码需要做修改.*
+
+以这种方法加载的代码会在全局作用域中执行,并在加入DOM树后立即生效.基本上,这就相当于在全局作用域中把源代码传给`eval()`方法.
+
+注意,通过`innerHTML`属性创建的`<script>`元素永远不会执行.浏览器会创建该元素,但是会打上永不执行的标签.
+
+`innerHTML`属性:对于元素节点,拥有`innerHTML`属性,对其赋值可以将其子节点变成一个文本节点,且其内容为所赋值:
+````JS
+let div = document.getElementById("myDiv");
+div.innerHTML = "abc"
+````
+则:
+````HTML
+<div id="myDiv">abc</div>
+````
+
+### 动态样式
+`CSS`样式在`HTML`页面中可以通过两个元素加载.`<link>`元素用于包含CSS外部文件,而`<style>`元素用于添加嵌入样式.动态样式在页面初始加载时并不存在,而是在之后才添加到页面中的.
+
+**`<link>`加载CSS外部文件:**
+
+若想要添加以下元素:
+````HTML
+<link rel="stylesheet" type="text/css" href="styles.css">
+````
+则:
+````JS
+function loadStyles(url) {
+    let link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.type = "text/css";
+    link.href = url;
+    let head = document.getElementsByTagName("head")[0];
+    head.appendChild(link);
+}
+loadStyles("styles.css");
+````
+
+通过外部文件加载样式是一个异步过程.因此,样式的加载和正执行的JS代码并没有先后顺序.
+
+**使用`<style>`元素包含嵌入的CSS规则**
+
+若想要添加以下元素:
+````JS
+<style type="text/css">
+body {
+    background-color: red;
+}
+</style>
+````
+则:
+````JS
+let style = document.createElement("style");
+style.type = "text/css";
+style.appendChild(document.createTextNode("body { background-color: red; }"));
+let head = document.getElementsByTagName("head")[0];
+head.appendChild(style);
+````
+
+*注:为了兼容IE,上述代码需要做修改.*
+
+### 操作表格
+使用DOM来创建`<table>`元素时,通常要涉及大量标签.  
+例如对于:
+````HTML
+<table border="1" width="100%">
+    <tbody>
+        <tr>
+            <td>Cell 1,1</td>
+            <td>Cell 2,1</td>
+        </tr>
+        <tr>
+            <td>Cell 1,2</td>
+            <td>Cell 2,2</td>
+        </tr>
+    </tbody>
+</table>
+````
+使用以下代码重建这个表格:
+````JS
+// 创建表格
+let table = document.createElement("table");
+table.border = 1;
+table.width = "100%";
+
+// 创建表体
+let tbody = document.createElement("tbody");
+table.appendChild(tbody);
+
+// 创建第一行
+let row1 = document.createElement("tr");
+tbody.appendChild(row1);
+let cell1_1 = document.createElement("td");
+cell1_1.appendChild(document.createTextNode("Cell 1,1"));
+row1.appendChild(cell1_1);
+let cell2_1 = document.createElement("td");
+cell2_1.appendChild(document.createTextNode("Cell 2,1"));
+row1.appendChild(cell2_1);
+
+// 创建第二行
+let row2 = document.createElement("tr");
+tbody.appendChild(row2);
+let cell1_2 = document.createElement("td");
+cell1_2.appendChild(document.createTextNode("Cell 1,2"));
+row2.appendChild(cell1_2);
+let cell2_2 = document.createElement("td");
+cell2_2.appendChild(document.createTextNode("Cell 2,2"));
+row2.appendChild(cell2_2);
+
+// 把表格添加到文档主体
+document.body.appendChild(table);
+````
+
+为了方便创建表格,`HTML DOM`给`<table>`,`<tbody>`和`<tr>`元素添加了一些属性和方法.
+
+`<table>`元素添加了以下属性和方法:
+- `caption`:指向`<caption>`元素的指针(如果存在)
+- `tBody`:包含`<tbody>`元素的`HTMLCollection`
+- `tFoot`:指向`<tfoot>`元素(如果存在)
+- `tHead`:指向`<thead>`元素(如果存在)
+- `rows`:包含表示所有行的`HTMLCollection`
+- `createTHead()`:创建`<thead>`元素,放到表格中,返回引用
+- `createTFoot()`:创建`<tfoot>`元素,放到表格中,返回引用
+- `createCaption()`:创建`<caption>`元素,放到表格中,返回引用
+- `deleteTHead()`:删除`<thead>`元素
+- `deleteTFoot()`:删除`<tfoot>`元素
+- `deleteCaption()`:删除`<caption>`元素
+- `deleteRow(pos)`:删除给定位置的行
+- `insertRow(pos)`:在行集合中给定位置插入一行
+
+`<tbody>`元素添加了以下属性和方法:
+- `rows`:包含`<tbody>`元素中所有行的`HTMLCollection`
+- `deleteRow(pos)`:删除给定位置的行
+- `insertRow(pos)`:在行集合中给定位置插入一行,返回该行的引用.
+
+`<tr>`元素添加了以下属性和方法:
+- `cells`:包含`<tr>`元素所有表元的`HTMLCollection`
+- `deleteCell(pos)`:删除给定位置的表元
+- `insertCell(pos)`:在表元集合给定位置插入一个表元,返回该表元的引用
+
+利用上面的方法,简化后的代码为:
+````JS
+// 创建表格
+let table = document.createElement("table");
+table.border = 1;
+table.width = "100%";
+
+// 创建表体
+let tbody = document.createElement("tbody");
+table.appendChild(tbody);
+
+// 创建第一行
+tbody.insertRow(0);
+tbody.rows[0].insertCell(0);
+tbody.rows[0].cells[0].appendChild(document.createTextNode("Cell 1,1"));
+tbody.rows[0].insertCell(1);
+tbody.rows[0].cells[1].appendChild(document.createTextNode("Cell 2,1"));
+
+// 创建第二行
+tbody.insertRow(1);
+tbody.rows[1].insertCell(0);
+tbody.rows[1].cells[0].appendChild(document.createTextNode("Cell 1,2"));
+tbody.rows[1].insertCell(1);
+tbody.rows[1].cells[1].appendChild(document.createTextNode("Cell 2,2"));
+
+// 把表格添加到文档主体
+document.body.appendChild(table);
+````
+
+### 使用NodeList
+`NodeList`对象和相关的`NamedNodeMap`,`HTMLCollection`这3个集合类型都是"实时的".任何文档结构的变化都会实时地在它们身上反映出来.
+
+`NodeList`就是基于DOM文档的实时查询.例如,下面的代码会导致无限循环:
+````JS
+let divs = document.getElementsByTagName("div");
+for (let i = 0; i < divs.length; ++i) {
+    let div = document.createElement("div");
+    document.body.appendChild(div);
+}
+````
+
+使用迭代器(`for-of`包括在内)也不会解决这个问题.
+
+为了避免这种问题发生,可以创建一个临时变量来记录遍历前的长度:
+````JS
+let divs = document.getElementsByTagName("div");
+for (let i = 0, len = divs.length; i < len; ++i) {
+    let div = document.createElement("div");
+    document.body.appendChild(div);
+}
+````
+或者反向迭代集合:
+````JS
+let divs = document.getElementsByTagName("div");
+for (let i = divs.length - 1; i >= 0; --i) {
+    let div = document.createElement("div");
+    document.body.appendChild(div);
+}
+````
+最好可以限制操作`NodeList`的次数,或者将查询到的`NodeList`缓存起来.
+
+## MutationObserver接口
+`MutationObserver`接口可以在DOM修改时异步执行回调.使用`MutationObserver`可以观察整个文档,DOM树的一部分,或某个元素.此外还可以观察元素属性,子节点,文本,或者前三者任意组合的变化.
+
+*注:`MutationObserver`接口是为了取代废弃的`MutationEvent`.*
+
+### 基本用法
+`MutationObserver`的实例要通过调用`MutationObserver`构造函数并传入一个回调函数来创建:
+````JS
+let observer = new MutationObserver(() => console.log('DOM was mutated.'));
+````
+
+#### observe()方法
+新创建的`MutationObserver`实例不会关联DOM的任何部分.使用`observe()`方法将实例与DOM关联.这个方法接收两个必需的参数:要观察其变化的DOM节点,以及一个`MutationObserverInit`对象.
+
+`MutationObserverInit`对象用于控制观察哪些方面的变化,是一个键值对形式配置选项的字典.  
+例如,下面的代码会创建一个`observer`并配置它观察`<body>`元素上的属性变化:
+````JS
+let observer = new MutationObserver(() => console.log('<body> attributes changed'));
+observer.observe(document.body, { attributes: true });
+// 此后,<body>元素(不包括其子元素)上任何属性发生变化都会被observer发现,然后就会异步执行注册的回调函数.
+document.body.className = 'foo';
+console.log('Changed body class');
+// Changed body class
+// <body> attributes changed
+````
+由于是异步执行的,所以`<body> attributes changed`最后才打印.
+
+#### 回调与MutationRecord
 
