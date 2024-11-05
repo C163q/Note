@@ -531,6 +531,30 @@
       - [MutationObserver的引用](#mutationobserver的引用)
       - [MutationRecord的引用](#mutationrecord的引用)
 - [DOM扩展](#dom扩展)
+  - [Selectors API](#selectors-api)
+    - [querySelector()](#queryselector)
+    - [querySelectorAll()](#queryselectorall)
+    - [matches()](#matches)
+  - [元素遍历](#元素遍历)
+  - [HTML5](#html5)
+    - [CSS类扩展](#css类扩展)
+      - [getElementsByClassName()](#getelementsbyclassname)
+      - [classList属性](#classlist属性)
+    - [焦点管理](#焦点管理)
+    - [HTMLDocument扩展](#htmldocument扩展)
+      - [readyState属性](#readystate属性)
+      - [compatMode属性](#compatmode属性)
+      - [head属性](#head属性)
+    - [字符集属性](#字符集属性)
+    - [自定义数据属性](#自定义数据属性)
+    - [插入标记](#插入标记)
+      - [innerHTML属性](#innerhtml属性)
+      - [outerHTML](#outerhtml)
+      - [insertAdjacentHTML()与insertAdjacentText()](#insertadjacenthtml与insertadjacenttext)
+      - [内存与性能问题](#内存与性能问题)
+      - [跨站点脚本](#跨站点脚本)
+    - [scrollIntoView()](#scrollintoview)
+  - [专有扩展](#专有扩展)
 
 # 认识JavaScript
 `JavaScript`包含: 核心(ECMAScript), 文档对象模型(DOM), 浏览器对象模型(BOM).
@@ -11769,4 +11793,309 @@ console.log(observer.takeRecords());
 这些`MutationRecord`实例会妨碍节点的回收.如果需要尽快地释放内存,并且要保存`MutationRecord`实例,建议从中取出最有用的信息,然后保存到一个新对象中,最后抛弃`MutationRecord`.
 
 # DOM扩展
+由于不断出现的专有扩展的出现,W3C将已成为事实标准的专有扩展编制成正式规范.DOM扩展包括:`Selectors API`,`HTML5`以及`Element Traversal`规范.这些扩展已经得到了所有主流浏览器的支持.
+
+## Selectors API
+`Selectors API`是W3C推荐标准,规定了浏览器原生支持的CSS查询API(也就是使用CSS的选择器的方式来筛选元素).
+
+`Selectors API Level 1`的核心是两个方法:`querySelector()`和`querySelectorAll()`.在兼容浏览器中,`Document`类型和`Element`类型的实例上都会暴露这两个方法.
+
+`Selectors API Level 2`规范在`Element`类型上新增了更多方法,比如`matches()`,`find()`和`findAll()`.不过,目前还没有浏览器实现或宣称实现`find()`和`findAll()`.
+
+### querySelector()
+`querySelector()`方法接收CSS选择符参数,返回匹配该模式的第一个后代元素,如果没有匹配项则返回`null`:
+````JS
+// 取得<body>元素
+let body = document.querySelector('body');
+// 取得ID为"myDiv"的元素
+let myDiv = document.querySelector('#myDiv');
+// 取得类名为"selected"的第一个元素
+let selected = document.querySelector(".selected");
+// 取得类名为"button"的<img>,且为<body>的后代(可以非直接)
+let img = document.body.querySelector("img.button");
+````
+
+在`Document`上使用`querySelector()`方法时,会从文档元素开始搜索(即搜索所有节点);在`Element`上使用`querySelector()`方法时,则只会从当前元素的后代(可以非直接)中查询.也可以在`DocumentFragment`上使用.
+
+如果选择符有语法错误或碰到不支持的选择符,则`querySelector()`方法会抛出错误.
+
+### querySelectorAll()
+`querySelectorAll()`方法跟`querySelector()`方法一样,但它会返回所有匹配的节点,这些节点放置在一个`NodeList`的*静态*(不是动态,为了防止性能问题)实例中.如果没有匹配项,则返回空的`NodeList`实例.
+
+返回的`NodeList`对象的详细操作见[节点关系](#节点关系)和[使用NodeList](#使用nodelist).
+
+其余性质与`querySelector()`方法相同.
+
+### matches()
+`matches()`方法(在规范草案中称为`matchesSelector()`)接收一个CSS选择符参数,如果存在匹配的元素,则返回`true`,否则返回`false`:
+````JS
+if (document.body.matches("body.page1")) { /*...*/ }
+````
+
+## 元素遍历
+IE9之前的版本会把元素间的空白符忽略,而其他浏览器会将其当作空白节点.这就导致了`childNodes`等属性上的差异.为了弥补这个差异,同时不影响DOM规范,W3C通过新的`Element Traversal`规范定义了一组新属性.
+
+`Element Traversal API`为DOM元素添加了5个属性:
+- `childElementCount`:返回子元素的数量(不包含文本节点和注释)
+- `firstElementChild`:指向第一个`Element`类型的子元素
+- `lastElementChild`:指向最后一个`Element`类型的子元素
+- `previousElementSibling`:指向前一个`Element`类型的同胞元素
+- `nextElementSibling`:指向后一个`Element`类型的同胞元素
+
+在支持的浏览器中,所有DOM元素都会有这些属性,为遍历DOM元素提供便利:
+````JS
+let parentElement = document.getElementById('parent');
+let currentChildElement = parentElement.firstElementChild;
+// 遍历所有子元素
+while (currentChildElement) {
+    processChild(currentChildElement);
+    if (currentChildElement === parentElement.lastElementChild) {
+        break;
+    }
+    currentChildElement = currentChildElement.nextElementSibling;
+}
+````
+
+在IE9及以上版本,以及所有现代浏览器都支持`Element Traversal`属性.
+
+## HTML5
+`HTML5`规范包含了与标记相关的大量`JavaScript API`定义.其中有的API与DOM重合,定义了浏览器应该提供的DOM扩展.
+
+### CSS类扩展
+#### getElementsByClassName()
+`getElementsByClassName()`暴露在`document`对象和所有HTML元素上.该方法接收一个参数,即包含一个或多个类名的字符串,返回类名中包含相应类的元素的`NodeList`.如果提供了多个类名,则顺序无关紧要,但类名需要全部满足:
+````JS
+// 取得所有元素中既包含类名"username"的,也包含类名"current"的元素
+// 这两个类名的顺序无关紧要
+let allCurrentUsernames = document.getElementsByClassName("username current");
+// 取得ID为"myDiv"的元素子树中所有包含"selected"类的元素
+let selected = document.getElementById("myDiv").getElementsByClassName("selected");
+````
+
+这个方法只会返回以调用它的对象为根元素的子树中所有匹配的元素.在`document`上调用`getElementsByClassName()`返回文档中所有匹配的元素,而在特定元素上调用`getElementsByClassName()`则返回该元素后代中匹配的元素.
+
+该方法返回的`NodeList`是动态的.
+
+IE9及以上版本,以及所有现代浏览器都支持`getElementsByClassName()`方法.
+
+#### classList属性
+要操作类名,可以通过`className`实现,但`className`是一个字符串.
+
+HTML5通过给所有元素增加`classList`属性为操作类名提供了更简单也更安全的实现方式.`classList`是一个新的集合类型`DOMTokenList`的实例.`DOMTokenList`有`length`属性表示包含的项,可以通过`item()`或中括号取得个别的元素,可以迭代.此外,该类型还有以下方法:
+- `add(value)`:向类名列表中添加指定的字符串值`value`.如果这个值已经存在,则什么也不做.
+- `contains(value)`:返回布尔值,表示给定的`value`是否存在.
+- `remove(value)`:从类名列表中删除指定的的字符串值`value`.
+- `toggle(value)`:如果类名列表中已经存在指定的`value`,则删除;如果不存在,则添加.
+
+使用例:
+````JS
+// 删除"disabled"类
+div.classList.remove("disabled");
+// 添加"current"类
+div.classList.add("current");
+````
+
+有了`classList`属性之后,除非是完全删除或完全重写元素的`class`属性,否则`className`属性就用不到了.IE10及以上版本(部分)和其他主流浏览器(完全)实现了`classList`属性.
+
+### 焦点管理
+`document.activeElement`始终包含当前拥有焦点的DOM元素.页面加载时,可以通过用户输入(按下Tab键或代码中使用`focus()`方法)让某个元素自动获得焦点.例如:
+````JS
+let button = document.getElementById("myButton");
+button.focus();
+console.log(document.activeElement === button); // true
+````
+默认情况下,`document.activeElement`在页面刚加载完之后会设置为`document.body`.而在页面完全加载之前,`document.activeElement`的值为`null`.
+
+`document.hasFocus()`方法,该方法返回布尔值,表示文档是否拥有焦点:
+````JS
+let button = document.getElementById("myButton");
+button.focus();
+console.log(document.hasFocus());   // true
+````
+
+确定文档是否获得了焦点,就可以帮助确定用户是否在操作页面.
+
+焦点管理对于保证Web应用程序的无障碍使用是非常重要的.
+
+### HTMLDocument扩展
+#### readyState属性
+`readyState`属性位于`document`上,该属性有两个可能的值:
+- `"loading"`:表示文档正在加载
+- `"complete"`:表示文档加载完成
+
+例如:
+````JS
+if (document.readyState == "complete") { /*...*/ }
+````
+
+#### compatMode属性
+`document`上的`compatMode`属性指示浏览器当前处于什么渲染模式,其可能值为:
+- `"CSS1Compat"`:文档处于标准模式或接近标准模式
+- `"BackCompat"`:文档处于混杂模式
+
+*由于所有模式现在都已经标准化了,因此这些名称都不再在标准中使用了.*
+
+#### head属性
+作为对`document.body`的补充,HTML5添加了`document.head`属性,指向文档的`<head>`元素.
+
+### 字符集属性
+HTML5增加了几个与文档字符集有关的新属性.
+
+`characterSet`属性表示文档实际使用的字符集,也可以用来指定新字符集.这个属性的默认值是`"UTF-16"`,但可以通过`<meta>`元素或响应头,或者直接修改自身来修改:
+````JS
+console.log(document.characterSet); // "UTF-16"
+document.characterSet = "UTF-8";
+````
+
+### 自定义数据属性
+`HTML5`允许给元素指定非标准的属性,但要使用前缀`data-`以告诉浏览器,这些属性既不包含与渲染有关的信息,也不包含元素的语义信息.除了前缀,自定义属性对命名是没有限制的:
+````HTML
+<div id="myDiv" data-appId="12345" data-myname="aaa"></div>
+````
+
+元素的`dataset`属性可以用来访问这些以`data-`开头的自定义属性.`dataset`属性是一个`DOMStringMap`的实例,包含一组键值对映射.元素可以通过`data-`后面的字符串作为键访问.  
+例如针对上面的HTML:
+````JS
+let div = document.getElementById("myDiv");
+// 读取自定义数据属性的值
+let appId = div.dataset.appId;  // 虽然浏览器可能会把appId标准化为app-id,但这仍然可行
+let myName = div.dataset.myname;
+// 设置自定义数据属性的值
+div.dataset.appId = 23456;  // 会被类型转换为"23456"
+div.dataset.myname = "bbb";
+// 存在"myname"吗?
+if (div.dataset.myname !== undefined) {
+    console.log(`Hello, ${div.dataset.myname}`);
+}
+````
+
+注意:如果HTML属性为`data-my-name`,则JS中键名为`myName`,因为`-`不是一个合法的命名变量的字符.如果书写HTML是使用`data-myName`,则浏览器会自动将其转换为`data-my-name`,使用键名`myName`访问仍然有效.
+
+自定义数据类型非常适合需要给元素附加某些数据的场景,比如链接追踪和在聚合应用程序中识别页面的不同部分.另外,单页应用程序框架也非常多地使用了自定义数据属性.
+
+### 插入标记
+#### innerHTML属性
+在读取元素的`innerHTML`属性时,会返回该元素所有后代的HTML字符串,包括元素,注释,文本节点.而在写入`innerHTML`时,则会根据提供的字符串以新的DOM子树代替元素中原来包含的所有结点.
+
+例如:
+````HTML
+<div id="content">
+    <p>This is a <strong>paragraph</strong> with a list following it.</p>
+    <ul>
+        <li>Item 1</li>
+        <li>Item 2</li>
+        <li>Item 3</li>
+    </ul>
+</div>
+````
+对于`<div>`元素,其`innerHTML`属性将有以下字符串:
+````JS
+`<p>This is a <strong>paragraph</strong> with a list following it.</p>
+<ul>
+    <li>Item 1</li>
+    <li>Item 2</li>
+    <li>Item 3</li>
+</ul>`
+````
+实际返回的文本内容可能会因浏览器而不同.
+
+在写入时,赋给`innerHTML`属性的值会被解析为DOM子树,并替换该元素之前的所有子节点.所附的值默认以HTML的形式解析,所以其中的所有标签都会以浏览器处理HTML的方式转换为元素.如果赋值中不包含任何HTML标签,则直接生成一个文本节点.
+````JS
+div.innerHTML = "Hello & welcome, <b>\"reader\"!</b>";
+````
+则HTML会转换为:
+````HTML
+<div id="content">Hello &amp; welcome, <b>&quot;reader&quot;!</b></div>
+````
+
+在将HTML字符串解析为DOM树时,浏览器会自动序列化,所以设置`innerHTML`属性后马上再读出来会得到不同的字符串(不是指字符实体).
+
+在现代浏览器中,通过`innerHTML`插入的`<script>`标签是不会执行的.而`<style>`元素可以正常加载.
+
+在IE8及之前的版本中,`<script>`和`<style>`被认为是"非受控元素"(其他的则是"受控元素"),如果给`<script>`指定了`defer`属性,且在该元素前的元素是"受控元素"(该元素需要和`<script>`同时插入),则插入的`<script>`是可以执行的,否则不能执行.同理,如果`<style>`元素前的元素是"受控元素"(该元素需要和`<style>`同时插入),则插入的`<style>`也是可以生效的,否则不能生效.
+
+*注意:`Firefox`在内容类型为`application/xhtml+xml`的XHTML文档中对`innerHTML`更加严格.在XHTML文档中使用`innerHTML`,必须使用格式良好的XHTML代码.否则,在`Firefox`中会静默失败.*
+
+#### outerHTML
+读取`outerHTML`属性时,会返回调用它的元素(及所有后代元素)的HTML字符串.在写入`outerHTML`属性时,调用它的元素会被传入的HTML字符串经解释之后生成的DOM子树取代.比如:
+````HTML
+<div id="content">
+    <p>This is a <strong>paragraph</strong> with a list following it.</p>
+    <ul>
+        <li>Item 1</li>
+        <li>Item 2</li>
+        <li>Item 3</li>
+    </ul>
+</div>
+````
+在`<div>`元素上访问`outerHTML`会返回相同的字符串,包括`<div>`本身.不同浏览器可能会返回不同的字符串(和`innerHTML`情况相同).
+
+如果使用`outerHTML`设置HTML:
+````JS
+div.outerHTML = "<p>This is a paragraph</p>";
+````
+则会将上面的字符串(会经过解析)整个替代`<div>`.
+
+#### insertAdjacentHTML()与insertAdjacentText()
+关于插入标签的另外两个新增方法是:`insertAdjacentHTML()`和`insertAdjacentText()`.它们都接收两个参数:要插入的标记的位置和要插入的HTML或文本.
+
+第一个参数必须是下列值的一个:
+- `"beforebegin"`:插入当前元素前面,作为前一个同胞节点
+- `"afterbegin"`:插入当前元素内部,作为新的子节点或放在第一个子节点前面
+- `"beforeend"`:插入当前元素内部,作为新的子节点或放在最后一个子节点后面
+- `"afterend"`:插入当前元素后面,作为下一个同胞节点.
+
+这几个值是不区分大小写的.第二个参数会作为HTML字符串解析(与`innerHTML`和`outerHTML`相同)或者作为纯文本解析(与`innerText`和`outerText`相同).如果是HTML,则会在解析出错时抛出错误:
+````JS
+element.insertAdjacentHTML("beforebegin", "<p>Hello world!</p>");
+element.insertAdjacentText("beforebegin", "Hello world!");
+````
+
+#### 内存与性能问题
+使用本节介绍的方法替换子节点可能会在浏览器(特别是IE)中导致内存问题.例如,被移除的子树元素中之前有关联的事件处理程序或其他JS对象指向它,那么元素就不会被垃圾回收.因此在使用这些方法前,最好手动删除要被替换的元素上关联的事件处理程序和JS对象.
+
+当大量插入HTML元素时,使用HTML解析器会比用JS多次创建并插入节点快的多.但是,频繁使用HTML解析器反而会降低性能.因此最好限制使用`innerHTML`和`outerHTML`的次数.
+
+例如,不要这么写:
+````JS
+for (let value of values) {
+    ul.innerHTML += `<li>${value}</li>`;    // 别这样做!
+}
+````
+而应该这么写以降低`innerHTML`的赋值次数:
+````JS
+let itemsHtml = "";
+for (let value of values) {
+    itemsHtml += `<li>${value}</li>`;
+}
+ul.innerHTML = itemsHtml;
+// 或 ul.innerHTML = values.map(value => `<li>${value}</li>`).join('');
+````
+
+#### 跨站点脚本
+尽管`innerHTML`不会执行自己创建的`<script>`标签,但仍然向恶意用户暴露了很大的攻击面,因为可以利用将输入信息赋值给`innerHTML`(如果JS中有这样逻辑的代码)等方法来执行`onclick`之类的属性.
+
+所以,如果页面中要使用用户提供的信息,则不建议使用`innerHTML`.与使用`innerHTML`获得的方便相比,防止XSS攻击更让人头疼.此时一定要隔离要插入的数据,在插入页面前必须毫不犹豫地使用相关的库对它们进行转义.
+
+### scrollIntoView()
+`HTML5`标准化了`scrollIntoView()`,该方法存在于所以HTML元素上,可以滚动浏览器窗口或容器元素以便包含元素进入视口.这个方法的参数如下:
+- `alignToTop`:是一个布尔值.
+  - `true`:窗口滚动后元素的顶部与视口顶部对齐.
+  - `false`:窗口滚动后元素的底部与视口底部对齐.
+- `scrollIntoViewOptions`:是一个选项对象.
+  - `behavior`:定义过渡动画,可取的值为`"smooth"`,`"auto"`,默认为`"auto"`.
+  - `block`:定义垂直方向的对齐,可取的值为`"start"`,`"center"`,`"end"`和`"nearest"`,默认为`start`.
+  - `inline`:定义水平方向的对齐,可取的值为`"start"`,`"center"`,`"end"`和`"nearest"`,默认为`"nearest"`.
+
+不传参数等同于`alignToTop`为`true`.上面`alignToTop`和`scrollIntoViewOptions`是二选一的.
+
+例如:
+````JS
+document.forms[0].scrollIntoView({behavior: 'smooth', block: 'start'});
+document.forms[0].scrollIntoView(true);
+````
+
+这个方法可以用来在页面上发生某个事件时引起用户关注.把焦点设置到一个元素上也会导致浏览器将元素滚动到可见位置.
+
+## 专有扩展
 
