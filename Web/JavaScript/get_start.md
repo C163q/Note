@@ -555,6 +555,25 @@
       - [跨站点脚本](#跨站点脚本)
     - [scrollIntoView()](#scrollintoview)
   - [专有扩展](#专有扩展)
+    - [children属性](#children属性)
+    - [contains()方法](#contains方法)
+    - [插入标记](#插入标记-1)
+      - [innerText属性](#innertext属性)
+      - [outerText](#outertext)
+      - [滚动](#滚动)
+- [DOM2 和 DOM3](#dom2-和-dom3)
+  - [DOM的演进](#dom的演进)
+    - [XML命名空间](#xml命名空间)
+      - [Node的变化](#node的变化)
+      - [Document的变化](#document的变化)
+      - [Element的变化](#element的变化)
+      - [NamedNodeMap的变化](#namednodemap的变化)
+    - [其他变化](#其他变化)
+      - [DocumentType的变化](#documenttype的变化)
+      - [Document的变化](#document的变化-1)
+      - [Node的变化](#node的变化-1)
+      - [内嵌窗格的变化](#内嵌窗格的变化)
+  - [样式](#样式)
 
 # 认识JavaScript
 `JavaScript`包含: 核心(ECMAScript), 文档对象模型(DOM), 浏览器对象模型(BOM).
@@ -12098,4 +12117,251 @@ document.forms[0].scrollIntoView(true);
 这个方法可以用来在页面上发生某个事件时引起用户关注.把焦点设置到一个元素上也会导致浏览器将元素滚动到可见位置.
 
 ## 专有扩展
+各家浏览器还有很多未被标准化的专有扩展.
+
+### children属性
+`children`属性是一个`HTMLCollection`,只包含元素的`Element`类型的子节点.如果元素的子节点类型全部是元素类型,那`children`和`childNodes`中包含的节点应该是一样的.
+
+### contains()方法
+`contains()`方法在要搜索的祖先元素上调用,参数是待确定的目标节点.如果目标节点是被搜索节点的后代,`contains()`返回`true`,否则返回`false`:
+````JS
+console.log(document.documentElement.contains(document.body));  // true
+````
+
+另外,使用`DOM level 3`的`compareDocumentPosition()`方法也可以确定节点间的关系.这个方法会返回表示两个节点关系的位掩码:
+- `0x1`:断开(传入的节点不在文档中)
+- `0x2`:领先(传入的节点在DOM树中位于参考节点之前)
+- `0x4`:随后(传入的节点在DOM树中位于参考节点之后)
+- `0x8`:包含(传入的节点是参考节点的祖先)
+- `0x10`:被包含(传入的节点是参考节点的后代)
+
+因此上面的代码等价于:
+````JS
+let result = document.documentElement.compareDocumentPosition(document.body);   // 0x14
+console.log(!!(result & 0x10));
+````
+
+IE9及之后的版本,以及所有现代浏览器都支持`contains()`和`compareDocumentPosition()`方法.
+
+### 插入标记
+`HTML5`将`innerHTML`和`outerHTML`纳入了标准,但`innerText`和`outerText`没有入选.
+
+#### innerText属性
+`innerText`属性对应元素中包含的所有文本内容,无论文本在子树中哪个层级.在读取值时,`innerText`会按照深度优先的顺序将子树中所有文本节点拼接起来.在用于写入值时,`innerText`会移除元素所有后代并插入一个包含该值的文本节点.
+
+例如对于:
+````HTML
+<div id="content">
+    <p>This is a <strong>paragraph</strong> with a list following it.</p>
+    <ul>
+        <li>Item 1</li>
+        <li>Item 2</li>
+        <li>Item 3</li>
+    </ul>
+</div>
+````
+`innerText`属性会返回以下字符串:
+```
+This is a paragraph with a list following it.
+Item 1
+Item 2
+Item 3
+```
+
+若使用
+````JS
+div.innerText = "Hello & welcome, <b>\"reader\"!</b>";
+````
+则执行这行代码后,HTML页面中的`<div>`元素就会变成这样:
+````HTML
+<div id="content">Hello &amp; welcome, &lt;b&gt;&quot;reader&quot;!&lt;/b&gt;</div>
+````
+
+`innerText`已经得到所有浏览器支持.
+
+#### outerText
+`outerText`与`innerText`是类似的,只不过作用范围包含调用它的节点.要读取文本值时,`outerText`与`innerText`实际上会返回同样的内容.但在写入文本值时,`outerText`会用新的文本节点替换掉`outerText`所在的整个元素.
+
+`outerText`未被所有主流浏览器支持,不推荐使用这个属性.
+
+#### 滚动
+不同浏览器仍然有除了`scrollIntoView()`以外的滚动相关的专有方法.例如:`scrollIntoViewIfNeeded()`仅仅在元素不可见的情况下,将其滚动到窗口中或包含窗口中,使其可见;如果已经在视口中可见,则这个方法什么也不做.
+
+但`scrollIntoView()`是唯一一个所有浏览器都支持的方法,所以只用它就可以了.
+
+# DOM2 和 DOM3
+## DOM的演进
+`DOM2 Core`和`DOM3 Core`模块的目标是扩展`DOM API`,满足`XML`的所有需要并提供更好的错误处理和特性检测.很大程度上,这意味着支持XML命名空间的概念.`DOM2 Core`没有新增任何类型,仅仅在`DOM1 Core`基础上增加了一些方法和属性.`DOM3 Core`除了增强原有类型,也新增了一些新类型.
+
+`DOM View`和`HTML`模块也丰富了`DOM`接口,定义了新的属性和方法.
+
+### XML命名空间
+XML命名空间可以实现在一个格式规范的文档中混用不同的XML语言,而不必担心元素命名冲突.XML命名空间在XHTML中才支持,HTML并不支持.
+
+命名空间是使用`xmlns`指定的.XHTML的命名空间是`"http://www.w3.org/1999/xhtml"`,应该包含在任何格式规范的XHTML页面的`<html>`元素中:
+````XHTML
+<html xmln="http://www.w3.org/1999/xhtml">
+    <head>
+        <!-- ... -->
+    </head>
+    <body>
+        <!-- ... -->
+    </body>
+</html>
+````
+上述例子中,所有元素都默认属于XHTML命名空间.可以使用`xmlns`给命名空间创建一个前缀,格式未`xmlns:前缀`,如下所示:
+````JS
+<xhtml:html xmlns:xhtml="http://www.w3.org/1999/xhtml">
+    <xhtml:head>
+        <!-- ... -->
+    </xhtml:head>
+    <xhtml:body xhtml:class="home">
+        <!-- ... -->
+    </xhtml:body>
+</xhtml:html>
+````
+上例中为XHTML命名空间定义了一个前缀`xhtml`,同时所有XHTML元素都必须加上这个前缀.为了避免混淆,属性也可以加上命名空间前缀.
+
+对于一个文档混合使用多种XML语言时,命名空间就有必要了.  
+例如,下面这个文档就使用了`XHTML`和`SVG`两种语言:
+````XML
+<html xmlns="http://www.w3.org/1999/xhtml">
+    <head>
+        <!-- ... -->
+    </head>
+    <body>
+        <s:svg xmlns:s="http://www.w3.org/2000/svg" version="1.1"
+            viewBox="0 0 100 100" style="width:100%; height:100%">
+            <s:rect x="0" y="0" width="100" height="100" style="fill:red" />
+        </s:svg>
+    </body>
+</html>
+````
+在上述例子中,通过给`<svg>`元素设置自己的命名空间,将其标识为当前文档的外来元素.因此,这个文档虽然是XHTML文档,但由于使用了命名空间,其中包含的SVG代码也是有效的.
+
+#### Node的变化
+为了与节点交互,并获取其命名空间,`DOM2`中,`Node`类型新增了以下特定于命名空间的属性:
+- `localName`:不包含命名空间前缀的节点名
+- `namespaceURI`:节点的命名空间URL,如果没有指定则为`null`;
+- `prefix`:命名空间前缀,如果未指定则为`null`.
+
+在节点使用命名空间前缀的情况下,`nodeName`等于`prefix + ":" + localName`.
+
+例如对于上例使用了`XHTML`和`SVG`两种语言的文档,`<html>`元素的`localName`和`tagName`都是`"html"`,`namespaceURL`是`"http://www.w3.org/1999/xhtml"`,而`prefix`是`null`.对于`<s:svg>元素`,`localName`是`"svg"`,`tagName`是`"s:svg"`,`namespaceURI`是`"https://www.w3.org/2000/svg"`,而`prefix`是`"s"`.
+
+`DOM3`进一步增加了如下与命名空间相关的方法:
+- `isDefaultNamespace(namespaceURI)`:返回布尔值,表示`namespaceURI`是否为节点的默认命名空间
+- `lookupNamespaceURI(prefix)`:返回给定`prefix`的命名空间URI
+- `lookupPrefix(namespaceURI)`:返回给定的`namespaceURI`的前缀
+
+对前面的例子,使用如下代码:
+````JS
+console.log(document.body.isDefaultNamespace("http://www.w3.org/1999/xhtml"));  // true
+// 假设svg包含对<s:svg>元素的引用
+console.log(svg.lookupPrefix("http://www.w3.org/2000/svg"));    // "s"
+console.log(svg.lookupNamespaceURI("s"));   // "http://www.w3.org/2000/svg"
+````
+
+#### Document的变化
+`DOM2`在`Document`上新增了如下命名空间特定的方法:
+- `createElementNS(namespaceURI, tagName)`:以给定的标签名`tagName`创建指定命名空间`namespaceURI`的一个新元素
+- `createAttributeNS(namespaceURI, attributeName)`:以给定的属性名`attributeName`创建指定命名空间`namespaceURI`的一个新属性
+- `getElementsByTagNameNS(namespaceURI, tagName)`:返回指定命名空间`namespaceURI`中所有标签名为`tagName`的元素的`NodeList`.
+
+所有这些方法传入的是相应命名空间URI(不是命名空间前缀):
+````JS
+let svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+let att = document.createAttributeNS("http://www.somewhere.com", "random");
+let elems = document.getElementsByTagNameNS("http://www.w3.org/1999/xhtml", "*");    // 获取所有XHTML元素
+````
+
+#### Element的变化
+`DOM2 Core`对`Element`类型的更新主要集中在对属性的操作上.下面是新增的方法:
+- `getAttributeNS(namespaceURI, localName)`:取得指定命名空间`namespaceURI`中名为`localName`的属性
+- `getAttributeNodeNS(namespaceURI, localName)`:取得指定命名空间`namespaceURI`中名为`localName`的属性节点
+- `getElementsByTagNameNS(namespaceURI, tagName)`:取得指定命名空间`namespaceURI`中标签名为`tagName`的元素的`NodeList`
+- `hasAttributeNS(namespaceURI, localName)`:返回布尔值,表示元素中是否有命名空间`namespaceURI`下名为`localName`的属性(注意,`DOM2 Core`也添加了不带命名空间的`hasAttribute()`方法)
+- `removeAttributeNS(namespaceURI, localName)`:删除指定命名空间`namespaceURI`中名为`localName`的属性
+- `setAttributeNS(namespaceURI, qualifiedName, value)`:设置指定命名空间`namespaceURI`中名为`qualifiedName`的属性为`value`
+- `setAttributeNodeNS(attNode)`:为元素设置(添加)包含命名空间信息的属性节点`attNode`
+
+#### NamedNodeMap的变化
+`NamedNodeMap`也增加了处理命名空间的方法.因为`NamedNodeMap`主要表示属性,所以这些方法大都适用于属性:
+- `getNamedItemNS(namespaceURI, localName)`:取得指定命名空间`namespaceURI`中名为`localName`的项
+- `removeNamedItemNS(namespaceURI, localName)`:删除指定命名空间`namespaceURI`中名为`localName`的项
+- `setNamedItemNS(node)`:为元素设置(添加)包含命名空间信息的节点
+
+### 其他变化
+`DOM2 Core`还对DOM的其他部分做了一些更新.这些变化与XML命名空间无关,主要关注DOM API的完整性与可靠性.
+
+#### DocumentType的变化
+`DocumentType`新增了3个属性:`publicId`,`systemId`和`internalSubset`.`publicId`,`systemId`属性表示文档类型声明中有效但无法使用`DOM1 API`访问的数据.`internalSubset`用于访问文档声明中可能包含的额外定义.比如下面这个HTML文档类型声明:
+````HTML
+<!DOCTYPE HTML PUBLIC "-// W3C// DTD HTML 4.01// EN"
+"http://www.w3.org/TR/html4/strict.dtd"
+[<!ELEMENT name (#PCDATA)>] >
+````
+
+其`publicId`是`"-// W3C// DTD HTML 4.01// EN"`,而`systemId`是`"http://www.w3.org/TR/html4/strict.dtd"`.`internalSubset`返回`"<!ELEMENT name (#PCDATA)>"`,HTML文档中几乎不会涉及文档类型的内部子集,XML文档中稍微常用一些.
+
+#### Document的变化
+`Document`类型的更新中唯一与命名空间无关的方法是`importNode()`.这个方法的目的是从其他文档获取一个节点并导入到新文档,以便将其插入新文档.每个节点都有一个`ownerDocument`属性,表示所属文档,如果调用`appendChild()`方法时传入节点的`ownerDocument`不是指向当前文档,则会发生错误.而调用`importNode()`导入其他文档的节点会返回一个新节点,这个新节点的`ownerDocument`属性是正确的.
+
+`importNode()`方法接收两个参数:要复制的节点和表示是否同时复制子树的布尔值,返回结果是适合在当前文档中使用的新节点.(参数类似于`cloneNode()`)
+
+这个方法在`XML`文档中使用会更多一点.
+
+`DOM2 View`给`Document`类型增加了新属性`defaultView`,是一个指向拥有当前文档的窗口(或窗格`<frame>`的指针).
+
+`DOM2 Core`还针对`document.implementation`对象增加了两个新方法:`createDocumentType()`和`createDocument()`.前者用于创建`DocumentType`类型的新节点,接收3个参数:文档类型名称,`publicId`和`systemId`.比如:
+````JS
+let doctype = document.implementation.createDocumentType("html",
+            "-// W3C// DTD HTML 4.01// EN",
+            "http://www.w3.org/TR/html4/strict.dtd");
+````
+
+已有文档的文档类型不可更改,因此`createDocumentType()`只在创建新文档时才会用到,而创建新文档要使用`createDocument()`方法.`createDocument()`接收3个参数:文档元素的`namespaceURI`,文档元素的标签名和文档类型.  
+例如,使用以下代码创建一个XHTML文档:
+````JS
+let doctype = document.implementation.createDocumentType("html",
+            "-// W3C// DTD XHTML 1.0 Strict// EN",
+            "http://www.w3.org/TR/xhtml/DTD/xhtml1-strict.dtd");
+let doc = document.implementation.createDocument("http://www.w3.org/1999/xhtml",
+        "html", doctype);
+````
+上述文档只有一个文档元素`<html>`(当然也有`<!DOCTYPE>`),其他一切都需要另行添加.
+
+`DOM2 HTML`模块也为`document.implamentation`对象添加了`createHTMLDocument()`方法.这个方法可以创建一个完整的HTML文档,包含`<html>`,`<head>`,`<title>`,`<body>`元素.这个方法只接收一个参数,即新创建文档的标题(放到`<title>`元素中).返回一个新的HTML文档(`HTMLDocument`类型的实例).
+
+#### Node的变化
+`DOM3`新增了两个用于比较节点的方法:`isSameNode()`和`isEqualNode()`.这两个方法都接收一个节点参数,如果这个节点与参考节点相同或相等,则返回`true`.节点相同,意味着引用同一个对象;节点相等,意味着节点类型相同,拥有相等的属性(`nodeName`,`nodeValue`等),而且`attributes`和`childNodes`也相等(即相同的位置包含相等的值).
+
+`DOM3`也增加了给DOM节点附加额外数据的方法.`setUserData()`方法接收3个参数:键,值,处理函数,用于给节点追加数据.
+
+**<p class="red_font">无论是`setUserData()`还是`getUserData()`,都已经在`DOM4`弃用了,因此多数浏览器不支持它们</p>**
+
+例如:
+````JS
+document.body.setUserData("name", "aaa", function() {});
+````
+然后,可以通过相同的键在取得这个信息:
+````JS
+let value = document.body.getUserData("name");
+````
+处理函数接收5个参数:表示操作类型的数值(1表示复制,2表示导入,3表示删除,4表示重命名),数据的键,数据的值,源节点,目标节点.删除节点时,源节点为`null`;除复制外,目标节点都为`null`.
+
+#### 内嵌窗格的变化
+`DOM2 HTML`给`HTMLIFrameElement`(即`<iframe>`,内嵌窗格)类型新增了一个属性,叫`contentDocument`.这个属性包含代表子内嵌窗格中的内容的`document`对象的指针:
+````JS
+let iframe = document.getElementById("myIfrane");
+let iframeDoc = iframe.contentDocument;
+````
+
+`contentDocument`属性是`Document`的实例.
+
+还有一个属性`contentWindow`,返回对应窗格的`window`对象,这个对象上有一个`document`属性.
+
+*注:跨源访问子内嵌窗格的`document`对象会受到安全限制.*
+
+## 样式
 
