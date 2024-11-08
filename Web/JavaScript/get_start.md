@@ -591,6 +591,14 @@
   - [范围](#范围)
     - [DOM范围](#dom范围)
     - [简单选择](#简单选择)
+    - [复杂选择](#复杂选择)
+    - [操作范围](#操作范围)
+    - [范围插入](#范围插入)
+    - [范围折叠](#范围折叠)
+    - [范围比较](#范围比较)
+    - [复制范围](#复制范围)
+    - [清理](#清理)
+- [事件](#事件)
 
 # 认识JavaScript
 `JavaScript`包含: 核心(ECMAScript), 文档对象模型(DOM), 浏览器对象模型(BOM).
@@ -12713,10 +12721,151 @@ let range = document.createRange();
 - `startContainer`:范围起点所在的节点(选区中第一个子节点的父节点).
 - `startOffset`:范围起点在`startContainer`中的偏移量.如果`startContainer`是文本节点,注释节点或CData区块节点,则`startOffset`指范围起点之前跳过的字符数;否则,表示范围中第一个节点的索引.
 - `endContainer`:范围终点所在的节点(选区中最后一个子节点的父节点).
-- `endOffset`:范围终点在`endContainer`中的偏移量.
+- `endOffset`:范围终点在`endContainer`中的偏移量(不包括).
 - `commonAncestorContainer`:文档中以`startContainer`和`endContainer`为后代的最深的节点.
 
 这些属性会在范围被放到文档中特定位置时获得对应的值.
 
 ### 简单选择
+`selectNode()`或`selectNodeContents()`方法都接收一个节点作为参数,并将该节点的信息添加到调用它的范围.`selectNode()`方法选择整个节点,包括其后代节点,而`selectNodeContents()`只选择节点的后代:
+````HTML
+<!DOCTYPE html>
+<html>
+    <body>
+        <p id="p1"><b>Hello</b> world!</p>
+    </body>
+</html>
+````
+````JS
+let range1 = document.createRange(),
+    range2 = document.createRange(),
+    p1 = document.getElementById("p1");
+range1.selectNode(p1);          // 选择 <p id="p1"><b>Hello</b> world!</p>
+range2.selectNodeContents(p1);  // 选择 <b>Hello</b> world!
+````
+
+调用`selectNode()`时,`startContainer`,`endContainer`和`commonAncestorContainer`都等于传入节点的父节点(上例中,为`document.body`).`startOffset`属性等于传入节点在其父节点`childNodes`集合中的索引(上例中,`startOffset`等于`1`,因为`<p>`元素前存在一个文本节点).`endOffset`等于`startOffset`加`1`(左闭右开).
+
+在调用`selectNodeContents()`时,`startContainer`,`endContainer`和`commonAncestorContainer`属性就是传入的节点(在这个例子中是`<p>`元素).`startOffset`属性始终为`0`,而`endOffset`等于传入节点的子节点数量(上例中为`2`).
+
+还可以在范围上调用相应的方法,实现对范围中选区的更精细的控制:
+- `setStartBefore(refNode)`:把范围的起点设置为`refNode`,从而让`refNode`成为选区的第一个子节点.`startContainer`属性被设置到`refNode.parentNode`,而`startOffset`属性被设置为`refNode`在其父节点`childNodes`集合中的索引.
+- `setStartAfter(refNode)`:把范围的起点设置到`refNode`之后,从而将`refNode`排除在选区之外,让其下一个同胞节点成为选区的第一个子节点.`startContainer`属性被设置为`refNode.parentNode`,`startOffset`属性被设置为`refNode`在其父节点`childNodes`集合中的索引加1.
+- `setEndBefore(refNode)`:把范围的终点设置到`refNode`之前,从而将`refNode`排除在选区之外,让其上一个同胞节点成为选区的最后一个子节点.`endContainer`属性被设置为`refNode.parentNode`,`endOffset`属性被设置为`refNode`在其父节点`childNodes`集合中的索引.
+- `setEndAfter(refNode)`:把范围的终点设置为`refNode`,从而让`refNode`成为选区的最后一个子节点.`endContainer`属性被设置为`refNode.parentNode`,`endOffset`属性被设置为`refNode`在其父节点`childNodes`集合中的索引加1.
+
+为了实现复杂的选区,也可以直接修改`startContainer`,`startOffset`,`endContainer`,`endOffset`的值.
+
+### 复杂选择
+`setStart()`和`setEnd()`方法都接收两个参数:参照节点和偏移量.对于`setStart()`来说,参照节点会成为`startContainer`,而偏移量会赋值给`startOffset`.对`setEnd()`而言,参照节点会成为`endContainer`,而偏移量会赋值给`endOffset`.
+
+假设想要选择上例中`"Hello"`中`"llo"`到`" world!"`中的`" wo"`的部分.则可以这么设置:
+````JS
+let p1 = document.getElementById("p1");
+    helloNode = p1.firstChild.firstChild,
+    worldNode = p1.lastChild;
+let range = document.createRange();
+range.setStart(helloNode, 2);
+range.setEnd(worldNode, 3);
+````
+因为`helloNode`和`worldNode`是文本节点,所以它们会成为范围内的`startContainer`和`endContainer`,这样`startOffset`和`endOffset`实际上表示每个节点中文字字符的位置,而不是子节点的位置.而`commonAncestorContainer`是`<p>`元素,即包含这两个节点的第一个祖先节点.
+
+### 操作范围
+创建范围之后,浏览器会在内部创建一个文档片段节点,用于包含范围选区中的节点.为操作选区范围的内容,选区中的内容必须格式完好.上例中,`"Hello"`中`"llo"`到`" world!"`中的`" wo"`的部分的范围不是完好的DOM结构,因为范围的起点和重点都在文本节点内部,所以无法在DOM中表示.不过,范围能够确定缺失的开始标签和结束标签,从而可以重构出有效的DOM结构,以便后续操作.
+
+重构是后台发生的,不会影响实际HTML,除非在删除操作之后无法形成正确的HTML结构.
+
+例如上例在后台会被修改成这样:
+````HTML
+<p><b>He</b><b>llo</b> world!<p>
+````
+其中,单独的`" world!"`文本节点被拆成了`" wo"`和`"rld!"`
+
+`deleteContents()`方法会从文档中删除范围包含的节点:`range.deleteContents()`.
+
+`extractContents()`会从文档中移除范围选区,并将其放入`DocumentFragment`对象并返回.
+
+`cloneContents()`方法创建一个副本,并将其放入`DocumentFragment`对象并返回.
+
+### 范围插入
+`insertNode()`方法可以在选区的开始位置插入一个节点.插入的节点也会被`Range`对象包含在内.  
+例如:
+````JS
+let p1 = document.getElementById("p1");
+    helloNode = p1.firstChild.firstChild,
+    worldNode = p1.lastChild;
+let range = document.createRange();
+range.setStart(helloNode, 2);
+range.setEnd(worldNode, 3);
+
+let span = document.createElement("span");
+span.style.color = "red";
+span.appendChild(document.createTextNode("Inserted text"));
+range.insertNode(span);
+````
+此时,HTML代码会变成:
+````HTML
+<p id="p1"><b>He<span style="color: red;">Inserted text</span>llo</b> world!</p>
+````
+
+`surroundContents()`方法将`Range`的内容移动到一个新节点作为其最后一个子节点,并将该新节点放置在范围所指定的起始位置.  
+例如:
+````JS
+let p1 = document.getElementById("p1");
+    helloNode = p1.firstChild.firstChild;
+let range = document.createRange();
+range.selectNode(helloNode);
+let span = document.createElement("span");
+span.style.backgroundColor = "yellow";
+range.surroundContents(span);
+````
+此操作会得到如下HTML:
+````HTML
+<p id="p1"><b><span style="background-color: yellow;">Hello</span></b> world!</p>
+````
+
+如果范围内不包含完整的DOM结构,则会失败并抛出错误.如果给定的节点是`Document`,`DocumentType`或`DocumentFragment`类型,也会导致抛出错误.
+
+### 范围折叠
+如果范围并没有选择文档的任何部分,则称为折叠.折叠类似于鼠标光标,起点和终点相同.
+
+使用`collapse()`方法可以折叠范围.这个方法接收一个参数:布尔值,表示折叠到范围的哪一端.`true`表示折叠到起点,`false`表示折叠到终点.
+
+`collapsed`属性返回一个布尔值,表示范围是否已经被折叠.
+
+测试范围是否被折叠,能够帮助确定范围中的两个节点是否相邻:
+````HTML
+<p id="p1">Paragraph 1</p><p id="p2">Paragraph 2</p>
+````
+````JS
+let p1 = document.getElementById("p1"),
+    p2 = document.getElementById("p2"),
+    range = document.createRange();
+range.setStartAfter(p1);
+range.setEndBefore(p2);
+console.log(range.collapsed);   // true
+````
+
+### 范围比较
+如果有多个范围,则可以使用`compareBoundaryPoints()`方法确定范围之间是否存在公共的边界(起点或终点).这个方法接收两个参数:要比较的范围和一个常量值,表示比较的方式.这个常量参数包括:
+- `Range.START_TO_START`(0):比较两个范围的起点
+- `Range.START_TO_END`(1):比较第一个范围的起点和第二个范围的终点
+- `Range.END_TO_END`(2):比较两个范围的终点
+- `Range.END_TO_START`(3):比较第一个范围的终点和第二个范围的起点
+
+`compareBoundaryPoints()`方法在第一个范围的边界点位于第二个范围的边界点前时返回`-1`,在两个范围的边界点相等时返回`0`,在第一个范围的边界点位于第二个范围的边界点之后返回`1`.
+
+### 复制范围
+调用范围的`cloneRange()`方法可以复制范围.这个方法会创建调用它的范围的副本.新属性包含与原始范围一样的属性,修改其边界点不会影响原始范围.
+
+### 清理
+在使用完范围之后,最好调用`detach()`方法把范围从创建它的文档中剥离.调用`detach()`之后,就可以放心解除对范围的引用,以便垃圾回收程序释放它所占用的内存:
+````JS
+range.detach();
+range = null;
+````
+剥离之后的范围就不能再使用了.
+
+# 事件
+
 
