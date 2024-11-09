@@ -599,6 +599,22 @@
     - [复制范围](#复制范围)
     - [清理](#清理)
 - [事件](#事件)
+  - [事件流](#事件流)
+    - [事件冒泡](#事件冒泡)
+    - [事件捕获](#事件捕获)
+    - [DOM事件流](#dom事件流)
+  - [事件处理程序](#事件处理程序)
+    - [HTML事件处理程序](#html事件处理程序)
+    - [DOM0事件处理程序](#dom0事件处理程序)
+    - [DOM2事件处理程序](#dom2事件处理程序)
+    - [IE事件处理程序](#ie事件处理程序)
+    - [跨浏览器事件处理程序](#跨浏览器事件处理程序)
+  - [事件对象](#事件对象)
+    - [DOM事件对象](#dom事件对象)
+    - [IE事件对象](#ie事件对象)
+    - [跨浏览器事件对象](#跨浏览器事件对象)
+  - [事件类型](#事件类型)
+    - [用户界面事件](#用户界面事件)
 
 # 认识JavaScript
 `JavaScript`包含: 核心(ECMAScript), 文档对象模型(DOM), 浏览器对象模型(BOM).
@@ -12867,5 +12883,374 @@ range = null;
 剥离之后的范围就不能再使用了.
 
 # 事件
+JS与HTML的交互是通过*事件*实现的,事件代表文档或浏览器窗口中某个有意义的时刻.可以使用仅再事件发生时执行的*监视器*(也叫处理程序)订阅事件.在传统软件工程领域,这个模型叫"观察者模式",其能够做到页面行为与页面展示的分离.
+
+即使所有主流浏览器都实现了`DOM2 Events`,规范也没有涵盖所有的事件类型.BOM也支持事件,但缺乏文档.而DOM3新增的事件API又让这些问题复杂化了.
+
+以下所有IE的专有事件都指的是IE8及以下版本的事件系统.
+
+## 事件流
+事件流描述了页面接收事件的顺序.例如,一个按钮被点击,实际上不光按钮,其他包含按钮的容器也会收到事件.
+
+### 事件冒泡
+IE(IE8前)的事件流被称为事件冒泡,因为事件被定义为从最具体的元素(文档树中最深的节点)开始触发,然后向上传播至没有那么具体的元素.
+
+所有现代浏览器都支持事件冒泡,只是在实现方式上会有一些变化.
+
+### 事件捕获
+`Netscape Communicator`提出了名为事件捕获的事件流.事件捕获的意思是最不具体的节点应该最先收到事件,而最具体的节点应该最后收到事件.事件捕获实际上是为了在事件到达最终目标前拦截事件.
+
+事件捕获得到了所有现代浏览器的支持.实际上,所有浏览器都是从`window`对象开始捕获事件,而`DOM2 Events`规范规定的是从`document`开始.
+
+由于旧版本浏览器不支持,因此实际当中几乎不会使用事件捕获.
+
+### DOM事件流
+`DOM2 Events`规范规定事件流分为3个阶段:事件捕获,到达目标和事件冒泡.事件捕获最先发生,为提前拦截事件提供了可能.然后,实际的目标元素接收到事件(通常也被认为是冒泡阶段的一部分).最后一个阶段是冒泡,最迟要在这个阶段相应事件.
+
+![DOM事件流](img/get_start/DOMEvent.png)
+
+注意:在捕获阶段实际的目标(上图为`<div>`)不会接收到事件.这是因为捕获阶段从`document`到`<html>`再到`<body>`就结束了.在`<div>`元素上触发事件是下一阶段的事.
+
+大多数支持DOM事件流的浏览器实现了一个拓展,虽然`DOM2 Events`规范明确捕获阶段不命中事件目标,但现代浏览器都会在捕获阶段在事件目标上触发事件.最终结果是在事件目标上有两个机会来处理事件.
+
+注意:所有现代浏览器都支持DOM事件流,只有`IE8`及更早版本不支持.
+
+## 事件处理程序
+事件意味着用户或浏览器执行的某种动作.比如,单击,加载,鼠标悬停.为相应事件而调用的函数被称为*事件处理程序*(或*事件监听器*).事件处理程序的名字以`"on"`开头,因此`click`事件的处理程序叫作`onclick`,而`load`事件的处理程序叫做`onload`.有很多方式可以指定事件处理程序.
+
+### HTML事件处理程序
+特定元素支持的每个事件都可以使用事件处理程序的名字以HTML属性的形式来指定.此时属性的值必须是能够执行的JS代码:
+````HTML
+<input type="button" value="Click Me" onclick="console.log('Clicked')">
+````
+转义字符在内嵌于HTML属性的JS代码中并非总是有效,使用字符实体属于语法错误:
+````HTML
+<input type="button" value="Click Me" onclick="console.log(&quto;Clicked&quto;)">   <!-- ERROR -->
+<input type="button" value="Click Me" onclick="console.log('Clicked\"')">           <!-- ERROR -->
+````
+内嵌的代码允许访问先前在全局作用域中的一切:
+````HTML
+<input type="button" value="Click Me" onclick="showMessage();">
+<script>
+    function showMessage() {
+        console.log("Hello world!")
+    }
+</script>
+<!-- 注意,由于此时是先加载的HTML按钮,后加载的函数定义,因此可能会导致用户在未加载完时点击按钮导致发生错误.
+ 可以使用try/catch块封装以便在这种情况下静默失败 -->
+````
+以这种方法指定的事件处理程序会创建一个函数来封装属性的值,因此以该方式定义的变量或函数均不可在外部使用.这个函数包含一个特殊的局部变量`event`,其中保存的就是`event`对象.
+````HTML
+<input type="button" value="Click Me" onclick="console.log(event.type)">    <!-- 输出"click" -->
+````
+在这个函数中,`this`值相当于事件的目标元素:
+````HTML
+<input type="button" value="Click Me" onclick="console.log(this.value)">    <!-- 输出"Click Me" -->
+````
+这个函数的作用域链被扩展了.在这个函数中,`document`和元素自身的成员都可以被当成局部变量来访问,类似于使用如下方法来包装:
+````JS
+function() {
+    with(document) {
+        with(this) {
+            // ...
+        }
+    }
+}
+````
+因此,可以这样访问属性:
+````HTML
+<input type="button" value="Click Me" onclick="console.log(value)"> <!-- 输出"Click Me" -->
+````
+如果这个元素是一个表单输入框,则作用域链中还会包含表单元素,类似于使用如下方法来包装:
+````JS
+function() {
+    with(document) {
+        with(this.form) {
+            with(this) {
+                // ...
+            }
+        }
+    }
+}
+````
+
+### DOM0事件处理程序
+JS中指定事件处理程序的传统方法是把一个函数赋值给(DOM元素的)一个事件处理程序属性.
+
+每个元素(包括`window`和`document`)都有通常小写的事件处理程序属性,比如`onclick`.只要把这个属性赋值为一个函数即可:
+````JS
+let btn = document.getElementById("myBtn");
+btn.onclick = function() {
+    console.log("Clicked");
+}
+````
+
+只有在代码运行到此处时,才会给事件处理程序赋值.因此可能出现用户点击按钮没有反应的情况.
+
+向这样使用DOM0方式为事件处理程序赋值时,所赋函数被视为元素的方法.因此,事件处理程序会在元素的作用域中运行,即`this`等于元素:
+````JS
+let btn = document.getElementById("myBtn");
+btn.onclick = function() {
+    console.log(this.id);   // "myBtn"
+}
+````
+
+以这种方式添加事件处理程序是注册在事件流的冒泡阶段的.
+
+将事件处理程序属性的值设置为`null`,可以移除通过DOM0方式添加的事件处理程序.
+
+*注:如果事件处理程序是在HTML中指定的,则`onclick`属性的值是一个包装相应HTML事件处理程序属性值的函数.这些事件处理程序也可以通过在JS中将相应属性设置为`null`来移除.*
+
+### DOM2事件处理程序
+`DOM2 Events`为事件处理程序的赋值和移除定义浏览两个方法:`addEventListener()`和`removeEventListener()`.这两个方法暴露在所有DOM节点上,它们接收3个参数:事件名,事件处理程序和一个布尔值,`true`表示在捕获阶段调用事件处理程序,`false`(默认值)表示在冒泡阶段调用事件处理程序.
+
+例如:
+````JS
+let btn = document.getElementById("myBtn");
+btn.addEventListener("click", function() {
+    console.log(this.id);   // myBtn
+}, false);
+````
+由于箭头函数的特性,其中的`this`指的是定义时的上下文,因此:
+````JS
+let btn = document.getElementById("myBtn");
+btn.addEventListener("click", () => {
+    console.log(this.id);   // undefined
+}, false);
+````
+
+`DOM2`方式的主要优势是可以添加多个事件处理程序:
+````JS
+let btn = document.getElementById("myBtn");
+btn.addEventListener("click", function() {
+    console.log(this.id);   // myBtn
+}, false);
+btn.addEventListener("click", function() {
+    console.log("Hello world!");    // Hello world!
+}, false);
+````
+
+事件处理程序会以添加顺序来触发.
+
+通过`addEventListener()`添加的事件处理程序只能使用`removeEventListener()`并传入与添加时同样的参数来移除,这意味着使用`addEventListener()`添加的匿名函数无法移除:
+````JS
+let btn = document.getElementById("myBtn");
+btn.addEventListener("click", function() {
+    console.log(this.id);   // myBtn
+}, false);
+btn.removeEventListener("click", function() {
+    console.log(this.id);
+}, false);  // 没有作用!
+````
+
+必须保证两者指向的是同一个函数:
+````JS
+let btn = document.getElementById("myBtn");
+let handler = function() {
+    console.log(this.id);
+};
+btn.addEventListener("click", handler, false);
+btn.removeEventListener("click", handler, false);   // 有效果
+````
+
+### IE事件处理程序
+IE使用`attachEvent()`和`detachEvent()`来为事件处理程序的赋值和移除.这两个方法接收两个参数:事件处理程序的名字和事件处理函数.因为`IE8`及更早的版本只支持事件冒泡,所以其添加到冒泡阶段.此外,事件名称应当加上`"on"`,例如`"onclick"`而非`"click"`.
+
+IE中,事件处理程序是在全局作用域中运行的,而非作为元素的作用域中,因此,`this`为`window`.此外,事件处理函数会以添加顺序*反向*触发.
+
+### 跨浏览器事件处理程序
+以下`EventUtil`能够保证在所有浏览器中都能进行事件处理,尽管无法保证一致性问题:
+````JS
+var EventUtil = {
+    addHandler: function(element, type, handler) {
+        if (element.addEventListener) {
+            element.addEventListener(type, hander, false);
+        } else if (element.attachEvent) {
+            element.attachEvent("on" + type, handler);
+        } else {
+            element["on" + type] = handler;
+        }
+    },
+    removeHandler: function(element, type, handler) {
+        if (element.removeEventListener) {
+            element.removeEventListener(type, handler, false);
+        } else if (element.detachEvent) {
+            element.detachEvent("on" + type, handler);
+        } else {
+            element["on" + type] = null;
+        }
+    }
+};
+````
+
+不过IE已经死了,所以其实使用DOM2的事件处理程序问题不大.
+
+## 事件对象
+在DOM中发生事件时,所有相关信息都会被收集并存储在一个名为`event`的对象中.这个对象包含了一些基本信息,比如导致事件的元素,发生的事件类型,以及可能与特定事件相关的任何其他数据.所有浏览器都支持这个`event`对象,尽管支持的方式不同.
+
+### DOM事件对象
+在`DOM`合规的浏览器中,`event`对象时传给事件处理程序的唯一参数.不管以哪种方式(DOM0或DOM2)指定事件处理程序,都会传入这个`event`对象:
+````JS
+let btn = document.getElementById("myBtn");
+btn.onclick = function(thisShouldBeTheEventObject) {
+    console.log(thisShouldBeTheEventObject.type);   // "click"
+}
+btn.addEventListener("click", (event) => {
+    console.log(event.type);    // "click"
+}, false);
+````
+
+通过HTML属性指定的事件处理程序中,同样可以使用变量`event`(但不能够自己命名)引用事件对象:
+````HTML
+<input type="button" value="Click Me" onclick="console.log(event.type)">
+````
+
+事件对象包含与特定事件相关的属性和方法.不同的事件生成的事件对象也会包含不同的属性和方法.不过,所有事件对象都会包含以下公共属性和方法:
+- `bubbles`:布尔值.只读.表示事件是否冒泡.
+- `cancelable`:布尔值.只读.表示是否可以取消事件的默认行为.
+- `currentTarget`:元素.只读.当前事件处理程序所在的元素.
+- `defaultPrevented`:布尔值.只读.`true`表示已经调用`preventDefault()`方法.(`DOM3 Events`中新增)
+- `detail`*(未查到)*:整数.只读.事件相关的其他信息.
+- `eventPhase`:整数.只读.表示调用事件处理程序的阶段:`1`代表捕获阶段,`2`代表到达目标,`3`代表冒泡阶段.
+- `preventDefault()`:函数.只读.用于取消事件的默认行为.只有`cancelable`为`true`才可以调用这个方法.
+- `stopImmediatePropagation()`:函数.只读.用于取消所有后续事件捕获或事件冒泡,并阻止调用任何后续事件处理程序.(`DOM3 Events`中新增)
+- `stopPropagation()`:函数.只读.用于取消所有后续事件捕获或事件冒泡.只有`bubbles`为`true`才可以调用这个方法.
+- `target`:元素.只读.事件目标.
+- `trusted`*(未查到)*:布尔值.只读.`true`表示事件是由浏览器生成的.`false`表示事件是开发者通过JS创建的.(`DOM3 Events`中新增)
+- `type`:字符串.只读.被触发的事件类型.
+- `view`*(未查到)*:`AbstractView`.只读.与事件相关的抽象视图.等于事件所发生的`window`对象.
+
+在事件处理程序内部,非箭头函数的`this`对象始终等于`currentTarget`的值,而`target`只包含事件的实际目标:
+````JS
+let btn = document.getElementById("myBtn");
+document.body.onclick = function(event) {
+    console.log(event.currentTarget === this);  // true
+    console.log(event.target === btn);          // true
+    console.log(event.target === event.currentTarget);  // false
+}
+````
+
+上述事件处理程序中,`btn`本身没有注册事件处理程序,但是由于`click`事件冒泡到`document.body`,从而触发了在它上面注册的处理程序.
+
+`type`属性在一个处理程序处理多个事件时很有用.例如:
+````JS
+let btn = document.getElementById("myBtn");
+let handler = function(event) {
+    switch(event.type) {
+        case "click":
+            console.log("Clicked");
+            break;
+        case "mouseover":
+            event.target.style.backgroundColor = "red";
+            break;
+        case "mouseout":
+            event.target.style.backgroundColor = "";
+            break;
+    }
+};
+btn.onclick = handler;
+btn.onmouseover = handler;
+btn.onmouseout = handler;
+````
+
+`preventDefault()`方法用于阻止特定事件的默认动作.比如,链接的默认行为就是在被单击时导航到`href`属性指定的URL.如果想阻止这个导航行为,可以在`onclick`事件处理程序中取消:
+````JS
+let link = document.getElementById("myLink");
+link.onclick = function(event) {
+    event.preventDefault();
+};
+````
+
+可以通过`preventDefault()`取消默认行为的事件,其事件对象的`cancelable`属性都会设置为`true`.
+
+`stopPropagation()`方法用于立即阻止事件流在DOM结构中传播,取消后续事件捕获或冒泡(实际上就是阻止冒泡,因为只有在冒泡阶段才能调用).例如,直接添加到按钮的事件处理程序中调用`stopPropagation()`,可以阻止`document.body`上注册的事件处理程序执行:
+````JS
+let btn = document.getElementById("myBtn");
+btn.onclick = function(event) {
+    console.log("Clicked");
+    event.stopPropagation();
+};
+document.body.onclick = function(event) {
+    console.log("Body clicked");    // 不会执行
+}
+````
+
+`eventPhase`属性用于确定事件流当前所处的阶段:
+````JS
+let btn = document.getElementById("myBtn");
+btn.onclick = function(event) {
+    console.log(event.eventPhase);  // 2
+}
+document.body.addEventListener("click", (event) => {
+    console.log(event.eventPhase);  // 1
+}, true);
+document.body.addEventListener("click", (event) => {
+    console.log(event.eventPhase);  // 3
+}, false);
+````
+
+*注:`event`对象只在事件处理程序执行期间存在,一旦执行完毕,就会被销毁.*
+
+### IE事件对象
+IE事件对象可以基于事件处理程序被指定的方式以不同方式来访问.如果事件处理程序是使用`DOM0`方式指定的,则`event`对象只是`window`对象的一个属性.如果事件处理程序是使用`attachEvent()`指定的,则`event`对象会作为唯一的参数传给处理函数.使用`attachEvent()`时,`event`对象仍然是`window`对象的属性,只是处于方便也将其作为参数传入.
+
+如果是`HTML`属性方式指定的事件处理程序,则`event`对象同样可以通过变量`event`访问.
+
+IE事件对象也包含与其创建的特定事件相关的属性和方法,但所有的IE事件对象都会包含下表所列的公共属性和方法:
+- `cancelBubble`:布尔值.读/写.默认为`false`,设置为`true`可以取消冒泡(与`stopPropagation()`方法相同)
+- `returnValue`:布尔值.读/写.默认为`true`,设置为`false`可以取消事件默认行为(与`preventDefault()`方法相同)
+- `srcElement`:元素.只读.事件目标(与`target`属性相同)
+- `type`:字符串.只读.触发的事件类型
+
+IE中,以DOM0方式指定的事件处理程序中,`this`当前元素,而在`attachEvent()`设置的情况下,`this`是`window`对象.
+
+### 跨浏览器事件对象
+基于前面的`EventUtil`对象,可以像这样再添加一些方法,以实现让两种事件模型之间的映射称为可能:
+````JS
+var EventUtil = {
+    addHandler: function(element, type, handler) {
+        // (见上文)
+    },
+    getEvent: function(event) {
+        return event ? event : window.event;
+    },
+    getTarget: function(event) {
+        return event.target || event.srcElement;
+    },
+    PreventDefault: function(event) {
+        if (event.preventDefault) {
+            event.preventDefault();
+        } else {
+            event.returnValue = false;
+        }
+    },
+    removeHandler: function(element, type, handler) {
+        // (见上文)
+    },
+    stopPropagation: function(event) {
+        if (event.stopPropagation) {
+            event.stopPropagation();
+        } else {
+            event.cancelBubble = true;
+        }
+    }
+};
+````
+
+## 事件类型
+所发生事件的类型决定了事件对象中会保存什么信息.`DOM3 Events`定义了如下事件类型:
+- `UIEvent`(用户界面事件):涉及与BOM交互的通用浏览器事件
+- `FocusEvent`(焦点事件):在元素获得和失去焦点时触发
+- `MouseEvent`(鼠标事件):使用鼠标在页面上执行某些操作时触发
+- `WheelEvent`(滚轮事件):使用鼠标滚轮(或类似设备)时触发
+- `InputEvent`(输入事件):向文档中输入文本时触发
+- `KeyboardEvent`(键盘事件):使用键盘在页面上执行某些操作时触发
+- `CompositionEvent`(合成事件):在使用某种IME(Input Method Editor,输入法编辑器)输入字符时触发
+
+除了这些事件类型之外,HTML5还定义了另一组事件,而浏览器通常在`DOM`和`BOM`上实现专有事件.这些专有事件并没有统一规范,因此不同浏览器会有所不同.
+
+`DOM3 Events`在`DOM2 Events`基础上重新定义了事件,并增加了新的事件类型.所有主流浏览器都支持`DOM2 Events`和`DOM3 Events`.
+
+### 用户界面事件
 
 
