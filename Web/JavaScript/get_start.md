@@ -609,12 +609,37 @@
     - [DOM2事件处理程序](#dom2事件处理程序)
     - [IE事件处理程序](#ie事件处理程序)
     - [跨浏览器事件处理程序](#跨浏览器事件处理程序)
-  - [事件对象](#事件对象)
+  - [事件(Event)对象](#事件event对象)
     - [DOM事件对象](#dom事件对象)
     - [IE事件对象](#ie事件对象)
     - [跨浏览器事件对象](#跨浏览器事件对象)
   - [事件类型](#事件类型)
-    - [用户界面事件](#用户界面事件)
+    - [用户界面事件(UIEvent)](#用户界面事件uievent)
+      - [load事件](#load事件)
+      - [unload事件(已弃用)](#unload事件已弃用)
+      - [resize事件](#resize事件)
+      - [scroll事件](#scroll事件)
+    - [焦点事件(FocusEvent)](#焦点事件focusevent)
+    - [鼠标(MouseEvent)和滚轮事件(WheelEvent)](#鼠标mouseevent和滚轮事件wheelevent)
+      - [客户端坐标](#客户端坐标)
+      - [页面坐标](#页面坐标)
+      - [屏幕坐标](#屏幕坐标)
+      - [修饰键](#修饰键)
+      - [相关元素](#相关元素)
+      - [鼠标按键](#鼠标按键)
+      - [额外事件信息](#额外事件信息)
+      - [mousewheel事件](#mousewheel事件)
+      - [触摸屏设备](#触摸屏设备)
+      - [无障碍问题](#无障碍问题)
+    - [键盘(KeyboardEvent)与输入事件(TextEvent)](#键盘keyboardevent与输入事件textevent)
+      - [键码](#键码)
+      - [字符编码](#字符编码)
+      - [DOM3的变化](#dom3的变化)
+      - [textInput事件(已废弃)](#textinput事件已废弃)
+    - [合成事件(CompositionEvent)](#合成事件compositionevent)
+    - [变化事件(MutationEvent)](#变化事件mutationevent)
+    - [HTML5事件](#html5事件)
+      - [contextmenu事件](#contextmenu事件)
 
 # 认识JavaScript
 `JavaScript`包含: 核心(ECMAScript), 文档对象模型(DOM), 浏览器对象模型(BOM).
@@ -12889,6 +12914,10 @@ JS与HTML的交互是通过*事件*实现的,事件代表文档或浏览器窗�
 
 以下所有IE的专有事件都指的是IE8及以下版本的事件系统.
 
+可在[MDN-Element](https://developer.mozilla.org/zh-CN/docs/Web/API/Element)的事件栏找到元素支持的事件.
+
+可在[MDN-Document](https://developer.mozilla.org/zh-CN/docs/Web/API/Document)的事件栏找到元素支持的事件.
+
 ## 事件流
 事件流描述了页面接收事件的顺序.例如,一个按钮被点击,实际上不光按钮,其他包含按钮的容器也会收到事件.
 
@@ -13085,7 +13114,7 @@ var EventUtil = {
 
 不过IE已经死了,所以其实使用DOM2的事件处理程序问题不大.
 
-## 事件对象
+## 事件(Event)对象
 在DOM中发生事件时,所有相关信息都会被收集并存储在一个名为`event`的对象中.这个对象包含了一些基本信息,比如导致事件的元素,发生的事件类型,以及可能与特定事件相关的任何其他数据.所有浏览器都支持这个`event`对象,尽管支持的方式不同.
 
 ### DOM事件对象
@@ -13110,7 +13139,7 @@ btn.addEventListener("click", (event) => {
 - `cancelable`:布尔值.只读.表示是否可以取消事件的默认行为.
 - `currentTarget`:元素.只读.当前事件处理程序所在的元素.
 - `defaultPrevented`:布尔值.只读.`true`表示已经调用`preventDefault()`方法.(`DOM3 Events`中新增)
-- `detail`*(未查到)*:整数.只读.事件相关的其他信息.
+- `detail`*(UIEvent)*:整数.只读.事件相关的其他信息.
 - `eventPhase`:整数.只读.表示调用事件处理程序的阶段:`1`代表捕获阶段,`2`代表到达目标,`3`代表冒泡阶段.
 - `preventDefault()`:函数.只读.用于取消事件的默认行为.只有`cancelable`为`true`才可以调用这个方法.
 - `stopImmediatePropagation()`:函数.只读.用于取消所有后续事件捕获或事件冒泡,并阻止调用任何后续事件处理程序.(`DOM3 Events`中新增)
@@ -13118,7 +13147,7 @@ btn.addEventListener("click", (event) => {
 - `target`:元素.只读.事件目标.
 - `trusted`*(未查到)*:布尔值.只读.`true`表示事件是由浏览器生成的.`false`表示事件是开发者通过JS创建的.(`DOM3 Events`中新增)
 - `type`:字符串.只读.被触发的事件类型.
-- `view`*(未查到)*:`AbstractView`.只读.与事件相关的抽象视图.等于事件所发生的`window`对象.
+- `view`*(UIEvent)*:`AbstractView`.只读.与事件相关的抽象视图.等于事件所发生的`window`对象.
 
 在事件处理程序内部,非箭头函数的`this`对象始终等于`currentTarget`的值,而`target`只包含事件的实际目标:
 ````JS
@@ -13243,7 +13272,7 @@ var EventUtil = {
 - `FocusEvent`(焦点事件):在元素获得和失去焦点时触发
 - `MouseEvent`(鼠标事件):使用鼠标在页面上执行某些操作时触发
 - `WheelEvent`(滚轮事件):使用鼠标滚轮(或类似设备)时触发
-- `InputEvent`(输入事件):向文档中输入文本时触发
+- `InputEvent`(输入事件)(**已废弃**):向文档中输入文本时触发
 - `KeyboardEvent`(键盘事件):使用键盘在页面上执行某些操作时触发
 - `CompositionEvent`(合成事件):在使用某种IME(Input Method Editor,输入法编辑器)输入字符时触发
 
@@ -13251,6 +13280,323 @@ var EventUtil = {
 
 `DOM3 Events`在`DOM2 Events`基础上重新定义了事件,并增加了新的事件类型.所有主流浏览器都支持`DOM2 Events`和`DOM3 Events`.
 
-### 用户界面事件
+### 用户界面事件(UIEvent)
+用户界面事件或UI事件不一定跟用户操作有关.这类事件在DOM规范出现之前就已经以某种形式存在了,保留它们是为了向后兼容.UI事件主要有以下几种:
+- `DOMActivate`**(已废弃)**:元素被用户通过鼠标或键盘操作激活时触发(比`click`或`keydown`更通用).此事件已废弃,因为浏览器的实现之间存在差异.
+- `load`:在`window`上当页面加载完成后触发,在窗套(`<frameset>`)上当所有窗格(`<frame>`)都加载完成后触发,在`<img>`元素上当图片加载完成后触发,在`<object>`元素上当相应对象加载完成后触发.
+- `unload`**(已弃用)**:在`window`上当页面完全卸载后触发,在窗套上当所有窗格都卸载完成后触发,在`<object>`元素上当对应对象卸载完成后触发.
+- `abort`:在`<object>`元素上当相应对象加载完成前被用户提前终止下载时触发.
+- `error`:在`window`上当JS报错时触发,在`<img>`元素上当无法加载指定图片时触发,在`<object>`元素上当无法加载相应对象时触发,在窗套上当一个或多个窗格无法加载时触发.
+- `select`:在文本框(`<input>`或`textarea`)上当用户选择了一个或多个字符时触发.
+- `resize`:在`window`或窗格上当窗口或窗格被缩放时触发.
+- `scroll`:当用户滚动包含滚动条的元素时在元素上触发.`<body>`元素包含已加载页面的滚动条.
 
+除了`DOMActivate`,这些事件在`DOM2 Events`中都被归为`HTML Events`.
+
+#### load事件
+`load`事件在`window`上当整个页面加载完成后触发.
+````JS
+window.addEventListener("load", (event) => {
+    console.log("Loaded!");     // Loaded!
+    console.log(event.target);  // #document
+    console.log(event.currentTarget);   // Window { ... }
+});
+````
+上面使用了`addEventListener()`方法来指定事件处理程序.虽然是在`window`对象上设置的,但DOM合规的浏览器中,`event.target`会被设置为`document`.
+
+如果要在HTML上指定`window`对象的`load`事件处理程序,则可以给`<body>`元素上`onload`属性赋值:
+````HTML
+<!DOCTYPE html>
+<html>
+<head>
+    <!-- ... -->
+</head>
+<body onload="console.log('Loaded!')">
+    <!-- ... -->
+</body>
+</html>
+````
+
+一般来说,任何在`window`上发生的事件,都可以通过给`<body>`元素上对应的属性赋值来指定,这是因为HTML中没有`window`元素.这实际上是为了保证向后兼容的一个策略,但在所有浏览器中都能得到很好的支持.实际开发中要尽量使用JS方式.
+
+*注:根据`DOM2 Events`,`load`事件应该在`document`而非`window`上触发.(不过MDN上也是给`window`设置`load`事件的)*
+
+图片上也会触发`load`事件,包括DOM中的图片和非DOM中的图片.可以在HTML中直接给`<img>`元素的`onload`属性指定事件处理程序.
+
+如果要用JS创建一个新的`<img>`元素,并给这个元素指定一个加载完成后执行的事件处理程序.需要在赋值`src`属性之前指定事件处理程序:
+````JS
+window.addEventListener("load", () => { // 由于向DOM中添加新元素,所以必须确保页面已经加载完成
+    let image = document.createElement("img");
+    image.addEventListener("load", (event) => { // 需要事先添加事件处理程序,防止错过
+        console.log(event.target.src);
+    });
+    document.body.appendChild(image);
+    image.src = "smile.gif";
+});
+````
+
+还有一些元素也支持`load`事件,但这是**非标准的**.
+- `<script>`元素会在JS文件加载完成后触发`load`事件,从而可以动态检测.
+- `<link>`元素会触发`load`事件,因而支持动态检测样式表是否加载完成.
+
+#### unload事件(已弃用)
+
+**已弃用**
+
+`unload`事件会在文档卸载完成后触发.`unload`事件一般是在从一个页面导航到另一个页面时触发,最常用于清理引用,以避免内存泄漏.
+
+同样可以在`window`对象上使用`addEventListener()`并传入`"unload"`来指定事件处理程序.也可以给`<body>`元素添加`onunload`属性.
+
+事件生成的`event`对象在DOM合规的浏览器中只有`target`属性,且值为`document`.
+
+因为`unload`事件是在页面卸载完成后触发的,所以不能使用页面加载后才有的对象.此时要访问DOM或修改页面外观都会导致错误.
+
+*注:根据`DOM2 Events`,`unload`事件应该在`<body>`而非`window`上触发.*
+
+#### resize事件
+当浏览器窗口被缩放到新高度或宽度时,会触发`resize`事件.这个事件在`window`上触发,因此可以通过JS在`window`上使用`addEventListener()`并传入`"resize"`,或者为`<body>`元素添加`onresize`属性指定事件处理程序.
+
+生成的`event`对象的`target`属性在DOM合规的浏览器中是`document`.
+
+用户在缩放浏览器的过程中会持续触发`resize`事件.应当避免在这个事件处理程序中执行过多计算或对其限流.
+
+*注:浏览器窗口在最大化和最小化时也会触发`resize`事件.*
+
+#### scroll事件
+当文档视图或元素滚动后,`scroll`事件就会触发.
+
+可滚动的元素可以查看其`scrollTop`和`scrollLeft`属性来查看两个方向上滚动的距离.
+
+用户在滚动时会持续触发`scroll`事件.应当避免在这个事件处理程序中执行过多的计算或对其限流.
+
+详见:
+- [MDN-Document：scroll 事件](https://developer.mozilla.org/zh-CN/docs/Web/API/Document/scroll_event)
+- [MDN-GlobalEventHandlers.onscroll](https://developer.mozilla.org/zh-CN/docs/Web/API/Element/scroll_event)
+
+示例:
+````HTML
+<body>
+    <textarea style="overflow: scroll; font-size: 50px" id="myText">222222222</textarea>
+</body>
+````
+````JS
+let textArea = document.getElementById("myText");
+textArea.addEventListener("scroll", (event) => {
+    console.log("Scroll!");
+    console.log(event.target.scrollTop);
+    console.log(event.target.scrollLeft);
+});
+````
+
+### 焦点事件(FocusEvent)
+焦点事件在页面元素获得或失去焦点时触发.这些事件可以与`document.hasFocus()`和`document.activeElement`一起为开发者提供用户在页面中导航的信息.焦点事件有以下6种:
+- `blur`:当元素失去焦点时触发.这个事件不冒泡.
+- `DOMFocusIn`**(已弃用)**
+- `DOMFocusOut`**(已弃用)**
+- `focus`:当元素获得焦点时触发.这个事件不冒泡.
+- `focusin`:当元素获得焦点时触发.这个事件相比`focus`支持冒泡.
+- `focusout`:当元素失去焦点时触发.这个事件相比`blur`支持冒泡.
+
+当焦点从页面中的一个元素移到另一个元素上时,会依次发生如下事件:
+- `focusout`在失去焦点的元素上触发
+- `focusin`在获得焦点的元素上触发
+- `blur`在失去焦点的元素上触发
+- `DOMFocusOut`在失去焦点的元素上触发
+- `focus`在获得焦点的元素上触发
+- `DOMFocusIn`在获得焦点的元素上触发
+
+### 鼠标(MouseEvent)和滚轮事件(WheelEvent)
+*鼠标事件*是Web开发中最常用的一组事件.`DOM3 Events`定义了9种鼠标事件:
+- `click`:在用户单击鼠标主键(通常是左键)或按键盘回车键时触发.这主要是基于无障碍的考虑,让键盘和鼠标都可以触发`onclick`事件处理程序.
+- `dblclick`:在用户双击鼠标主键(通常是左键)时触发.
+- `mousedown`:在用户按下任意鼠标键时触发.这个事件不能通过键盘触发.
+- `mouseenter`:在用户把鼠标光标从元素外部移到元素内部时触发.这个事件不冒泡,也不会在光标经过后代元素时触发.
+- `mouseleave`:在用户把鼠标光标从元素内部移到元素外部时触发.这个事件不冒泡,也不会再光标经过后代元素时触发.
+- `mousemove`:在鼠标光标在元素上移到时反复触发.这个元素不能通过键盘触发.
+- `mouseout`:在用户把鼠标光标从一个元素移到另一个元素上时触发.移到的元素可以是原始元素的外部元素,也可以是原始元素的子元素.这个事件不能通过键盘触发.
+- `mouseover`:在用户把鼠标光标从元素外部移到元素内部时触发.这个事件不能通过键盘触发.
+- `mouseup`:在用户释放鼠标键时触发.这个事件不能通过键盘触发.
+
+页面中的所有元素都支持鼠标事件,除了`mouseenter`和`mouseleave`,所有鼠标事件都会冒泡,都可以被取消,而这会影响浏览器的默认行为,也会影响其他事件.
+
+一个双击事件永远以如下顺序触发:
+1. `mousedown`
+2. `mouseup`
+3. `click`
+4. `mousedown`
+5. `mouseup`
+6. `click`
+7. `dblclick`
+
+不在同一个元素上触发`mouseup`或`mousedown`或其一事件被取消,那么`click`事件就不会触发.两个连续的`click`事件中任意一个不触发则`dblclick`不会被触发.
+
+鼠标事件还有一个名为滚轮事件的子类别.滚轮事件只有一个事件`mousewheel`,反映的是鼠标滚轮或带滚轮的类似设备上滚轮的交互.
+
+#### 客户端坐标
+鼠标事件都是在浏览器视口中的某个位置上发生的.这些信息被保存在`event`对象的`clientX`和`clientY`属性中.这两个属性表示事件发生时鼠标光标在视口中的坐标.
+
+![客户端坐标](img/get_start/clientPosition.png)
+
+客户端坐标不考虑页面滚动,因此这两个值并不代表鼠标在页面上的位置.
+
+#### 页面坐标
+页面坐标是事件发生时,鼠标光标在页面上的坐标,通过`event`对象的`pageX`和`pageY`可以获取.这两个属性表示鼠标光标在页面上的位置,因此可以反映的是光标到页面而非视口左边与上边的距离.
+
+`pageX`和`pageY`也可以通过`clientX`和`clientY`以及`document.document.Element`的`scrollLeft`和`scrollTop`属性计算获得.(用于IE8及以前的版本)
+
+#### 屏幕坐标
+
+屏幕事件不仅是在浏览器窗口中发生的,也是在整个屏幕上发生的.可以通过`event`对象的`screenX`和`screenY`属性获取鼠标光标在屏幕上的坐标.
+
+![屏幕坐标](img/get_start/screenPosition.png)
+
+#### 修饰键
+有时候要确定用户想实现的操作,还要考虑键盘按键的状态.键盘上的修饰键`Shift`,`Ctrl`,`Alt`,`Meta`经常用户修改鼠标事件的行为.DOM规定了4个属性来表示这几个修饰键的状态:`shiftKey`,`ctrlKey`,`altKey`和`metaKey`.这些属性会在各自对应的修饰键被按下时包含布尔值`true`,没有被按下时包含`false`.在鼠标事件发生的,可以通过这几个属性来检测修饰键是否被按下:
+````JS
+let div = document.getElementById("myDiv");
+div.addEventListener("click", (event) => {
+    let keys = new Array();
+    if (event.shiftKey) {
+        keys.push("shift");
+    }
+    if (event.ctrlKey) {
+        keys.push("ctrl");
+    }
+    if (event.altKey) {
+        keys.push("alt");
+    }
+    if (event.metaKey) {
+        keys.push("meta");
+    }
+    console.log("Keys: " + keys.join(","));
+});
+````
+
+*注:IE8及更早版本不支持`metaKey`属性.*
+
+#### 相关元素
+对`mouseover`和`mouseout`事件而言,这两个事件都涉及从一个元素边界之内把光标移到另一个元素的边界之内.对`mouseover`事件来说,事件的主要目标时获得光标的元素,相关元素时失去光标的元素.类似的,对`mouseout`事件来说,事件的主要目标是失去光标的元素,而相关元素是获得光标的元素.
+
+DOM通过`event`对象的`relatedTarget`属性提供了相关元素的信息(指向相关元素的引用).这个属性只有在`mouseover`和`mouseout`事件发生时才包含值,其他所有事件的这个属性的值都是`null`.对于IE8及更早版本,这个属性分别用`fromElement`和`toElement`表示.
+
+#### 鼠标按键
+对`mousedown`和`mouseup`事件来说,`event`对象上会有一个`button`属性,表示按下或释放的是哪个按键.DOM为这个`button`属性定义了几个值:
+- `0`表示鼠标主键(通常为左键或默认值)(如`document.getElementById('a').click()`这样触发就会是默认值)
+- `1`表示鼠标中键
+- `2`表示鼠标副键(通常为右键).
+- `3`表示鼠标第四个按钮,通常指浏览器后退按钮
+- `4`表示鼠标第五个按钮，通常指浏览器的前进按钮
+
+`MouseEvent.button`仅能指示最后一个被按下/释放的鼠标按键.
+
+`MouseEvent.buttons`则可以指示多个鼠标按键被按下的情形.
+- `0`:没有按键或者是没有初始化
+- `1`:鼠标左键
+- `2`:鼠标右键
+- `4`:鼠标滚轮或者是中键
+- `8`:第四按键(通常是“浏览器后退”按键)
+- `16`:第五按键(通常是“浏览器前进”)
+
+其值为按下按键数值之或.
+
+#### 额外事件信息
+对于鼠标事件来说,`detail`包含一个数值,表示在给定位置上发生了多少次单击.一次单击相当于在同一像素上发生一次`mousedown`紧跟一次`mouseup`.每次单击会加`1`.如果鼠标在`mousedown`和`mouseup`之间移动了或在单击之间移动了,则`detail`会重置为`0`.
+
+#### mousewheel事件
+`mousewheel`事件会在用户使用鼠标滚轮时触发,包括在垂直方向上任意滚动.这个事件会在任何元素上触发,并冒泡到`document`和`window`.`mousewheel`事件的`event`对象包含鼠标事件的所有标准信息,此外还有一个名为`wheelDelta`的新属性.当鼠标滚轮向前滚动时,`wheelDalta`每次值都为`+120`;而当鼠标滚轮向后滚动时,`wheelDelta`每次值都为`-120`.
+
+#### 触摸屏设备
+触摸屏通常不支持鼠标操作.在为触摸屏设备开发时,要记住以下事项:
+- 不支持`dblclick`事件.双击浏览器窗口可以方法,但没有办法覆盖这个行为.
+- 单指点触屏幕上的可点击元素会触发`mousemove`事件.如果操作会导致内容变化,则不会再触发其他事件.如果屏幕上没有变化,则会相继触发`mousedown`,`mouseup`和`click`事件.点触不可点击的元素不会触发事件.可点击元素是指点击时有默认动作的元素(如链接)或制定了`onclick`事件处理程序的元素.
+- `mousemove`事件也会触发`mouseover`和`mouseout`事件.
+- 双指点触屏幕并滑动导致页面滚动时会触发`mousewheel`和`scroll`事件.
+
+#### 无障碍问题
+如果Web应用或网站必须考虑残障人士,特别是使用屏幕阅读器的用户,那么必须小心使用鼠标事件.因为除了`click`事件之外的其他鼠标事件都不能用键盘触发,会严重妨碍盲人或视障用户使用.以下是使用鼠标事件时应该遵循的无障碍建议:
+- 使用`click`事件执行代码.
+- 不要使用`mouseover`向用户显示新选项.
+- 不要使用`dblclick`执行重要的操作.
+
+详见:[WebAIM](https://webaim.org)
+
+### 键盘(KeyboardEvent)与输入事件(TextEvent)
+键盘事件是用户操作键盘时触发的.`DOM2 Events`最初定义了键盘事件,但该规范再最终发布前删除了相应内容.`DOM3 Events`为键盘事件提供了一个首先在`IE9`中完全实现的规范.其他浏览器也开始实现该规范,但仍然存在很多遗留问题的实现.
+
+键盘事件包含3个事件:
+- `keydown`:用户按下键盘上某个键时触发,而且持续按住会重复触发.
+- `keypress`**(已废弃,推荐使用`textInput`事件)**:用户按下键盘上某个键并产生字符时触发,而且会持续按住并重复触发.`Esc`键也会触发这个事件.
+- `keyup`:用户释放键盘上某个键时触发.
+
+输入事件只有一个,即`textInput`(**已废弃**).这个事件用于在文本显示给用户之前更方便地截获文本输入.`textInput`会在文本被插入到文本框之前触发.
+
+键盘事件支持与鼠标事件相同的修饰键.`shiftKey`,`ctrlKey`,`altKey`和`metaKey`属性在键盘事件中都是可用的.
+
+#### 键码
+
+**keyCode属性已过时,请使用code属性代替**
+
+对于`keydown`和`keyup`事件,`event`对象的`keyCode`属性中会保存一个键码,对应键盘上特定的一个键.
+
+对于字母和数字键,`keyCode`的值与小写字母和数字的ASCII编码一致,而且跟是否按了`Shift`无关.`A`为`65`,`0`为`48`.
+
+关于键盘上所有非字符键的键码,详见[MDN-keyCode](https://developer.mozilla.org/zh-CN/docs/Web/API/KeyboardEvent/keyCode#%E9%94%AE%E7%A0%81%E5%80%BC)
+
+`KeyboardEvent.code`属性用于替代**过时的**`keyCode`属性,关于其键码,详见:[MDN-code](https://developer.mozilla.org/zh-CN/docs/Web/API/KeyboardEvent/code#code_values)
+
+#### 字符编码
+
+**charCode属性已过时,请使用key属性代替**
+
+`event`对象上支持`charCode`属性 **(已废弃)**,只有在`keypress`事件时这个属性才会被设置值,包含的是按键字符对应的ASCII编码.
+
+`KeyboardEvent.key`属性能够返回按下键的字符串名称,例如`"k"`或`"Shift"`或`"ArrowDown"`,关于具体名称,见[MDN-code](https://developer.mozilla.org/zh-CN/docs/Web/API/KeyboardEvent/code#code_values)
+
+#### DOM3的变化
+`DOM3 Events`也支持一个名为`location1`的属性,该属性是一个数值,表示是在哪里按的键.可能的值为:`0`是默认值,`1`是左边(如左边的`Alt`键),`2`是右边(如右边的`Shift`键),`3`是数字键盘,`4`是移动设备(**已废弃**),`5`是游戏手柄(**已废弃**).
+
+`getModifierState()`接收一个参数,这个参数是一个等于`"Shift"`,`"Control"`,`"Alt"`,`"AltGraph"`或`"Meta"`的字符串,表示要检测的修饰符.如果给定的修饰键处于激活状态(键被按住),则方法返回`true`,否则返回`false`.
+
+不过,`event`对象已经通过`shiftKey`,`altKey`,`ctrlKey`和`metaKey`属性暴露了这些信息.
+
+#### textInput事件(已废弃)
+
+*已废弃,请使用`input`,`beforeinput`,`keyup`,`keydown`事件来替代*
+
+`textInput`事件在字符被输入到可编辑区域时触发.`textInput`只在可编辑区域上触发,且只有新字符被插入时才会触发(因此不包含退格键等).
+
+`textInput`在`event`上提供了一个`data`属性,包含要插入的字符.
+
+还有一个名为`inputMethod`的属性,表示向控件中输入文本的手段:
+- 0表示浏览器不能确定
+- 1表示键盘
+- 2表示粘贴
+- 3表示拖放
+- 4表示IME
+- 5表示表单选项
+- 6表示手写
+- 7表示语音
+- 8表示组合方式
+- 9表示脚本
+
+### 合成事件(CompositionEvent)
+合成事件用于处理通常使用IME输入时的复杂输入序列.IME可以让用户输入物理键盘上没有的字符(输入法).合成事件用于检测和控制这种输入.合成事件有以下3种:
+- `compositionstart`:在IME的文本合成系统打开时触发,表示输入即将开始.
+- `compositionupdate`:在新字符插入输入字段时触发.
+- `compositionend`:在IME的文本合成系统关闭时触发,表示恢复正常键盘输入.
+
+该事件继承了`Event`和`UIEvent`的属性,唯一增加的事件属性就是`data`:
+- 在`compositionstart`种,包含正在编辑的文本
+- 在`compositionupdate`中,包含要插入的新字符
+- 在`compositionend`中,包含本次合成过程中输入的全部内容
+
+### 变化事件(MutationEvent)
+
+**已弃用**
+
+### HTML5事件
+这些事件不是DOM规范涵盖的,但在HTML5规范中列出,并在浏览器中有较好的支持.
+
+#### contextmenu事件
+`contextmenu`事件属于`MouseEvent`.
 
