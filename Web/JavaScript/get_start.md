@@ -640,6 +640,31 @@
     - [变化事件(MutationEvent)](#变化事件mutationevent)
     - [HTML5事件](#html5事件)
       - [contextmenu事件](#contextmenu事件)
+      - [beforeunload事件](#beforeunload事件)
+      - [DOMContentLoaded事件](#domcontentloaded事件)
+      - [readystatechange事件](#readystatechange事件)
+      - [pageshow与pagehide事件](#pageshow与pagehide事件)
+      - [hashchange事件](#hashchange事件)
+    - [设备事件](#设备事件)
+      - [orientationchange事件(已废弃)](#orientationchange事件已废弃)
+      - [deviceorientation事件](#deviceorientation事件)
+      - [devicemotion事件](#devicemotion事件)
+    - [触摸及手势事件](#触摸及手势事件)
+      - [触摸事件(TouchEvent)](#触摸事件touchevent)
+      - [手势事件(GestureEvent)](#手势事件gestureevent)
+    - [事件参考](#事件参考)
+  - [内存和性能](#内存和性能)
+    - [事件委托](#事件委托)
+    - [删除事件处理程序](#删除事件处理程序)
+  - [模拟事件](#模拟事件)
+    - [DOM模拟事件](#dom模拟事件)
+      - [模拟鼠标事件](#模拟鼠标事件)
+      - [模拟键盘事件](#模拟键盘事件)
+      - [模拟其他事件](#模拟其他事件)
+      - [自定义DOM事件](#自定义dom事件)
+    - [IE事件模拟](#ie事件模拟)
+    - [使用事件构造器](#使用事件构造器)
+- [动画与Canvas图形](#动画与canvas图形)
 
 # 认识JavaScript
 `JavaScript`包含: 核心(ECMAScript), 文档对象模型(DOM), 浏览器对象模型(BOM).
@@ -13145,7 +13170,7 @@ btn.addEventListener("click", (event) => {
 - `stopImmediatePropagation()`:函数.只读.用于取消所有后续事件捕获或事件冒泡,并阻止调用任何后续事件处理程序.(`DOM3 Events`中新增)
 - `stopPropagation()`:函数.只读.用于取消所有后续事件捕获或事件冒泡.只有`bubbles`为`true`才可以调用这个方法.
 - `target`:元素.只读.事件目标.
-- `trusted`*(未查到)*:布尔值.只读.`true`表示事件是由浏览器生成的.`false`表示事件是开发者通过JS创建的.(`DOM3 Events`中新增)
+- `isTrusted`:布尔值.只读.`true`表示事件是由浏览器生成的.`false`表示事件是开发者通过JS创建的.(`DOM3 Events`中新增)
 - `type`:字符串.只读.被触发的事件类型.
 - `view`*(UIEvent)*:`AbstractView`.只读.与事件相关的抽象视图.等于事件所发生的`window`对象.
 
@@ -13599,4 +13624,288 @@ DOM通过`event`对象的`relatedTarget`属性提供了相关元素的信息(指
 
 #### contextmenu事件
 `contextmenu`事件属于`MouseEvent`.
+
+Window95最先提出通过单击鼠标右键呼出上下文菜单的概念(Mac上是`Ctrl+单击`),这个功能在Web上也得以实现.`contextmenu`事件专门用于表示何时该显示上下文菜单,从而允许开发者取消默认的上下文菜单并提供自定义菜单.
+
+`contextmenu`事件冒泡,因此只要给`document`指定一个事件处理程序就可以处理页面上所有的同类事件.事件目标是触发操作的元素.这个事件在所有浏览器中都可以取消.
+
+例如:
+````HTML
+<!DOCTYPE html>
+<html>
+<head>
+        <!-- ... -->
+</head>
+<body>
+    <div id="myDiv" style="height: 100px; width: 100px; background-color: blue;">Right click or Ctrl+click me to get a custom context menu.
+        Click anywhere else to get the default context menu.</div>
+    <ul id="myMenu" style="position: absolute; visibility: hidden; background-color: silver">
+        <li><a href="https://www.example.com">example1</a></li>
+        <li><a href="https://www.example.com">example2</a></li>
+        <li><a href="https://www.example.com">example3</a></li>
+    </ul>
+</body>
+</html>
+````
+````JS
+window.addEventListener("load", (event) => {
+    let div = document.getElementById("myDiv");
+    div.addEventListener("contextmenu", (event) => {
+        event.preventDefault();
+        let menu = document.getElementById("myMenu");
+        menu.style.left = event.clientX + "px";
+        menu.style.top = event.clientY + "px";
+        menu.style.visibility = "visible";
+    });
+    document.addEventListener("click", (event) => {
+        document.getElementById("myMenu").style.visibility = "hidden";
+    });
+});
+````
+
+#### beforeunload事件
+`beforeunload`事件会在`window`上触发,用意是给开发者提供阻止页面被卸载的机会.这个事件会在页面即将从浏览器中卸载时触发,如果页面需要继续使用,则可以不被卸载.这个事件不能取消,也不支持冒泡,不然就可以把用户拦在一个页面上.相反,这个事件会向用户显示一个确认框,其中的消息表明浏览器即将卸载页面,并请用户确认是否希望关闭页面.
+
+详见:[MDN-BeforeUnloadEvent](https://developer.mozilla.org/zh-CN/docs/Web/API/BeforeUnloadEvent)
+
+#### DOMContentLoaded事件
+`window`的`load`事件会在页面完全加载后触发,而`DOMContentLoaded`事件会在DOM树构建完成后立即触发,而不用等待图片,JS文件,CSS文件或其他资源加载完成.相对于`load`事件`DOMContentLoaded`可以让开发者在外部资源下载的同时就能指定事件处理程序,从而让用户能够更快地与页面交互.
+
+例如:
+````JS
+document.addEventListener("DOMContentLoaded", (event) => {
+  console.log("DOM 完全加载和解析");
+});
+````
+
+需要给`document`或`window`添加事件处理程序(实际的事件目标是`document`,但会冒泡到`window`).
+
+该事件属于通用的`Event`类型.
+
+如果浏览器不支持`DOMContentLoaded`事件,可以使用:
+````JS
+setTimeout(() => {
+    // "事件处理程序",不保证执行时间
+}, 0);
+````
+
+#### readystatechange事件
+该事件属于`Event`类型
+
+该事件旨在提供文档或元素加载状态的信息,当文档或元素的`readyState`属性发生改变时,就会触发.
+
+支持`readystatechange`事件的对象要求其存在`readyState`属性,该属性具有一个以下列出的可能的字符串值:
+- `uninitialized`:对象存在并尚未初始化.
+- `loading`:对象正在加载数据.
+- `loaded`:对象已经加载完数据.
+- `interactive`:对象可以交互,但尚未加载完成.
+- `complete`:对象加载完成.
+
+并非所有对象都会经历所有`readyState`阶段,某些对象会跳过某个阶段,但并未说明哪些阶段适用于哪些对象.
+
+`load`和`readystatechange`在实际中并没有严格的先后顺序的关系.
+
+#### pageshow与pagehide事件
+*往返缓存*的功能旨在使用浏览器的"前进"和"后退"按钮时加快网页之间的切换.这个缓存(存储在内存中)不仅存储页面的数据,也存储DOM和JS状态.如果页面存储在缓存中,那么导航到这个页面时就不会触发`load`事件.
+
+`pageshow`和`pagehide`事件属于`PageTransitionEvent`,该类(接口)继承自`Event`,多出了示例属性`persisted`.
+
+`pageshow`事件在页面显示时触发,无论是否来自往返缓存.在新加载的页面上,`pageshow`会在`load`事件之后触发;在来自往返缓存的页面上,`pageshow`会在页面状态完全恢复后触发.注意,虽然这个事件的目标是`document`,但事件处理程序必须添加到`window`上.
+
+`persisted`属性是一个布尔值,对于`pageshow`来说,如果页面在存储在了往返缓存中就是`true`,否则就是`false`,第一次触发时,`pageshow`的`persisted`始终是`false`.
+
+`pagehide`会在页面从浏览器中卸载后,在`unload`事件之前触发或者在浏览器中被隐藏时触发.对于`pagehide`的`persisted`,`true`表示页面在卸载以后会保存在往返缓存中,其值始终为`true`,除非不符合使用往返缓存的条件.
+
+`pagehide`事件同样是在`document`上触发,但事件处理程序必须被添加到`window`.
+
+*注意:注册了`onunload`事件处理程序(即使是空函数)的页面会自动排除在往返缓存之外.这是因为`onunload`事件典型的使用场景是撤销`onload`事件发生时所做的事情,如果使用往返缓存,则下一次页面显示时就不会触发`onload`事件,而这可能导致页面无法使用.*
+
+#### hashchange事件
+`hashchange`事件用于在`URL`散列值(URL最后#后面的部分)发生变化时触发事件.
+
+该事件属于`HashChangeEvent`,继承自`Event`.
+
+该事件处理程序必须添加给`window`.`event`对象有两个新属性:`oldURL`和`newURL`,表示变化前后的URL,而且是包含散列值的完整`URL`.
+
+### 设备事件
+设备事件可以用于确定用户使用设备的方式.用于定义新设备及设备相关的事件
+
+#### orientationchange事件(已废弃)
+
+**已废弃**
+
+#### deviceorientation事件
+*Baseline 2023 Newly available*
+
+`deviceorientation`属于`DeviceOrientationEvent`,继承于`Event`.
+
+该事件不可取消也不会冒泡.
+
+如果可以获取设备的加速计信息,而且数据发生了变化,这个事件就会在`window`上触发.`deviceorientation`事件只反映设备在空间中的朝向,而不涉及移动相关的信息.
+
+设备本身处于3D空间,即拥有x轴,y轴和z轴坐标系中.如果把设备静止放在水平的表明上,那么三轴的值均为0,其中,x轴方向为设备左侧到右侧,y轴方向为设备从底部到上部,z轴方向为从设备背面到正面.
+
+当`deviceorientation`触发时,`event`对象中会包含各个轴相对于设备静置时坐标值的变化,主要是以下5个属性:
+- `alpha`:0~360范围的浮点数,表示围绕z轴旋转时y轴的度数(左右转).
+- `beta`:-180~180范围内的浮点数,表示围绕x轴旋转时z轴的度数(前后转).
+- `gamma`:-90~90范围内的浮点数,表示围绕y轴旋转时z轴的度数(扭转).
+- `absolute`:布尔值,表示设备是否返回绝对值.
+- `compassCailbrated`:布尔值,表示设备的指南针是否正确校准.
+
+![deviceorientation](img/get_start/deviceorientation.png)
+
+![alpha-beta-gamma](img/get_start/orientation_abg.png)
+
+#### devicemotion事件
+仅在仅在一些支持的浏览器的安全上下文(HTTPS)中可用.
+
+该事件属于`DeviceMotionEvent`,继承于`Event`.
+
+这个事件用于提示设备实际上在移动,而不仅仅时改变了朝向.当该事件被触发时,`event`对象包含如下属性:
+- `acceleration`:对象,包含x,y和z属性,包含不考虑重力的情况下各个维度的加速度信息.
+- `accelerateIncludingGravity`:对象,包含x,y和z属性,反映各个维度的加速度信息,包含z轴自然重力加速度.
+- `interval`:毫秒,距离下次触发`devicemotion`事件的时间.此值在时间之间应为常量.
+- `rotationRate`:对象,包含`alpha`,`beta`,`gamma`属性,表示设备朝向.
+
+如果上述值无法提供,则属性值为`null`.
+
+### 触摸及手势事件
+#### 触摸事件(TouchEvent)
+
+`TouchEvent`继承自`UIEvent`.
+
+当手指放在屏幕上,在屏幕上滑动或从屏幕移开时,*触摸事件*即会触发.触摸事件有如下几种:
+- `touchstart`:手指放到屏幕上时触发(即使有一个手指已经放在了屏幕上)
+- `touchmove`:手指在屏幕上滑动时连续触发.在这个事件中调用`preventDefault()`可以阻止滚动.
+- `touchend`:手指从屏幕上移开时触发.
+- `touchcancel`:系统停止追踪触摸时触发.
+
+这些事件都会冒泡,都可以被取消.每个触摸事件提供了鼠标事件的公共属性:`bubbles`,`cancelable`,`view`,`clientX`,`clientY`,`screenX`,`screenY`,`detail`,`altKey`,`shiftKey`,`ctrlKey`和`metaKey`.(理论上后面的这4个属性不是继承的,而是自有的)
+
+触摸事件还提供了以下3个属性用于追踪触点:
+- `touches`:`Touch`对象的数组,表示当前屏幕上的每个触点
+- `targetTouches`:`Touch`对象的数组,表示特定于事件目标的触点
+- `changedTouches`:`Touch`对象的数组,表示自上次用户动作之后变化的触点
+
+每个`Touch`对象都包含下列属性:
+- `clientX`:触点在视口中的x坐标
+- `clientY`:触点在视口中的y坐标
+- `identifier`:触点ID
+- `pageX`:触点在页面上的x坐标
+- `pageY`:触点在页面上的y坐标
+- `screenX`:触点在屏幕上的x坐标
+- `screenY`:触点在屏幕上的y坐标
+- `target`:触摸事件的事件目标
+- `rotation`:手指变化旋转的角度(两个以上触点时)
+- `scale`:两指之间距离变化(对捏)的程度(两个以上触点时)
+
+#### 手势事件(GestureEvent)
+
+**非标准**
+
+*手势事件*会在两个手指触碰屏幕且相对距离或旋转角度变化时触发.手势事件有以下3种:
+- `gesturestart`:一个手指已经放到屏幕上,再把另一个手指放到屏幕上时触发.
+- `gesturechange`:任何一个手指在屏幕上的位置发生变化时触发.
+- `gustureend`:其中一个手指离开屏幕时触发.
+
+触摸事件和手势事件存在一定关系.当一个手指放在屏幕上时,会触发`touchstart`事件.当另一个手指放到屏幕上时,`gesturestart`事件会首先触发,然后紧接着触发这个手指的`touchstart`事件.如果两个手指或其中一个手指移动,则会触发`gesturechange`事件.只要其中一个手指离开屏幕,就会触发`gustureend`事件,紧接着触发该手指的`touchend`事件.
+
+手势事件的`event`包含`bubbles`,`cancelable`,`view`,`clientX`,`clientY`,`screenX`,`screenY`,`detail`,`altKey`,`shiftKey`,`ctrlKey`,`metaKey`以及`rotation`和`scale`.`rotation`属性表示手指变化旋转的度数,负值表示逆时针旋转,正值表示顺时针旋转.`scale`表示两指之间的距离变化(对捏)的程度,开始时为1,然后随着距离增大或缩小相应地增大或缩小.
+
+### 事件参考
+参见:
+- [事件参考](https://developer.mozilla.org/zh-CN/docs/Web/Events)
+- [Web-API-Event](https://developer.mozilla.org/zh-CN/docs/Web/API/Event)
+
+## 内存和性能
+在JS中,页面中事件处理程序的数量与页面整体性能直接相关.原因包括:每个函数都是对象,都占用内存空间,对象很多,性能很差;其次,为指定事件处理程序所需访问DOM的次数会先期造成整个页面交互的延迟.只要在使用事件处理程序时多注意一些方法,就可以改善页面性能.
+
+### 事件委托
+*事件委托*利用事件冒泡,可以只使用一个事件处理程序来管理一种类型的事件.例如,`click`事件冒泡到`document`.这意味着可以为整个页面指定一个`onclick`事件处理程序,而不用为每个可点击元素分别指定事件处理程序.
+
+例如:
+````HTML
+<ul id="myLinks">
+    <li id="goSomewhere">Go somewhere</li>
+    <li id="doSomething">Do something</li>
+    <li id="sayHi">Say hi</li>
+</ul>
+````
+````JS
+let list = document.getElementById("myLinks");
+list.addEventListener("click", (event) => {
+    let target = event.target;
+    switch(target.id) {
+        case "doSomething":
+            document.title = "I changed the document's title";
+            break;
+        case "goSomewhere":
+            location.href = "https://www.example.com";
+            break;
+        case "sayHi":
+            console.log("hi");
+            break;
+    }
+});
+````
+
+只要可行,就应该考虑只给`document`添加一个事件处理程序,通过它处理页面中所有某种类型的事件.相对于之前的技术,事件委托具有如下优点:
+- `document`对象随时可用,任何时候都可以给它添加事件处理程序(不用等待`DOMContentLoaded`或`load`事件).这意味着只要页面渲染出可点击元素,就可以无延迟地起作用.
+- 节省花在设置页面事件处理程序上的事件.只指定一个事件处理程序既可以节省DOM引用,也可以节省时间.
+- 减少整个页面所需的内存,提升整体性能.
+
+最适合使用事件委托的事件包括:`click`,`mousedown`,`mouseup`,`keydown`,`keypress`.
+
+### 删除事件处理程序
+应该及时删除不用的事件处理程序.很多Web应用性能不佳都是由于无用的事件处理程序长驻内存导致的.
+
+导致这个问题的主要原因有两个.第一个时删除带有事件处理程序的元素.比如通过`removeChild()`或`replaceChild()`删除节点或者使用`innerHTML`整体替换页面的某一部分.这时候,被删除的元素上有事件处理程序,就不会被垃圾收集程序正常清理.
+
+在事件处理程序中删除事件目标元素会阻止事件冒泡.只有事件目标仍然存在于文档中时,事件才会冒泡.
+
+## 模拟事件
+
+### DOM模拟事件
+可以使用`document.createEvent()`方法创建一个`event`对象.这个方法接收一个参数,此参数是一个表示要创建事件类型的字符串.
+
+**警告:与`createEvent`一起使用的许多方法(例如`initCustomEvent`)已被弃用.大多数事件对象现在都有构造函数,这是创建事件对象实例的现代推荐方法**
+
+可以作为创建事件类型的字符串见[DOM 标准—步骤2中的表格](https://dom.spec.whatwg.org/#dom-document-createevent)
+
+创建`event`对象之后,需要使用事件相关的信息来初始化.每种类型的`event`对象都有特定的方法,可以使用相应数据来完成初始化.方法的名字并不相同,这取决于调用`createEvent()`时传入的参数.
+
+模拟事件的最后一步是触发事件.为此要使用`dispatchEvent()`方法,这个方法存在于所有支持事件的DOM节点之上.`dispatchEvent()`方法接收一个参数,即表示要触发事件的`event`对象.
+
+#### 模拟鼠标事件
+
+**已弃用**
+
+模拟鼠标事件需要先创建一个新的鼠标`event`对象,然后再使用必要的信息对其进行初始化.要创建鼠标`event`对象,可以调用`createEvent()`方法并传入`"mouseEvents"`参数.这样就会返回一个`event`对象,这个对象有一个`initMouseEvent()`方法(**已弃用**)(接收15个参数),用于为新对象指定鼠标的特定信息.
+
+由于`initMouseEvent()`方法已弃用,可以查看[MDN-initMouseEvent](https://developer.mozilla.org/zh-CN/docs/Web/API/MouseEvent/initMouseEvent),不作赘述.也可以查看[使用事件构造器](#使用事件构造器)以了解替代的方法.
+
+#### 模拟键盘事件
+创建键盘事件的方式是给`createEvent()`方法传入参数`"keyboardEvent"`,并将返回的`event`对象使用`initKeyboardEvent`方法(**已弃用,请不要使用**).
+
+由于`initKeyboardEvent()`方法已弃用,可以查看[MDN-initKeyboardEvent](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/initKeyboardEvent),不作赘述.也可以查看[使用事件构造器](#使用事件构造器)以了解替代的方法.
+
+#### 模拟其他事件
+要模拟HTML事件,也是为`createEvent()`传入`"HTMLEvents"`,然后再使用返回对象的`initEvent()`(**已弃用**)方法来初始化.
+
+#### 自定义DOM事件
+DOM3增加了自定义事件的类型.自定义事件不会触发原生DOM事件,但可以让开发者定义自己的事件.要创建自定义事件,需要调用`createEvent("CustomEvent")`.返回的对象包含`initCustomEvent()`(**已弃用**)方法.
+
+由于`initCustomEvent()`方法已弃用,可以查看[MDN-initCustomEvent](https://developer.mozilla.org/zh-CN/docs/Web/API/CustomEvent/initCustomEvent),不作赘述.也可以查看[使用事件构造器](#使用事件构造器)以了解替代的方法.
+
+### IE事件模拟
+IE8及以下版本的事件系统与DOM不同,模拟事件也就不同.
+
+其是通过`document`对象的`createEventObject()`方法(不接受参数)来创建`event`对象,返回的是一个通用的`event`对象.然后可以手工给返回的对象指定希望该对象具备的所有属性(可以指定任何属性).最后一步是在事件目标上调用`fireEvent()`方法,这个方法接收两个参数:事件处理程序的名称(例如`"onclick"`)和`event`对象.调用`fireEvent()`时,`srcElement`和`type`属性会自动指派到`event`对象.
+
+### 使用事件构造器
+详见[MDN-创建和触发事件](https://developer.mozilla.org/zh-CN/docs/Web/Events/Creating_and_triggering_events).
+
+任何事件都可以通过构造函数来创建,而非`createEvent()`方法.
+
+# 动画与Canvas图形
 
