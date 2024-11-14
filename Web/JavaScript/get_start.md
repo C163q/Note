@@ -665,6 +665,21 @@
     - [IE事件模拟](#ie事件模拟)
     - [使用事件构造器](#使用事件构造器)
 - [动画与Canvas图形](#动画与canvas图形)
+  - [使用requestAnimationFrame](#使用requestanimationframe)
+    - [早期定时动画和问题](#早期定时动画和问题)
+    - [requestAnimationFrame](#requestanimationframe)
+    - [cancelAnimationFrame](#cancelanimationframe)
+    - [通过requestAnimationFrame节流](#通过requestanimationframe节流)
+  - [基本的画布功能](#基本的画布功能)
+  - [2D绘图上下文](#2d绘图上下文)
+    - [填充和描边](#填充和描边)
+    - [绘制矩形](#绘制矩形)
+    - [绘制路径](#绘制路径)
+    - [绘制文本](#绘制文本)
+    - [变换](#变换)
+    - [绘制图像](#绘制图像)
+    - [阴影](#阴影)
+    - [渐变](#渐变)
 
 # 认识JavaScript
 `JavaScript`包含: 核心(ECMAScript), 文档对象模型(DOM), 浏览器对象模型(BOM).
@@ -13908,4 +13923,351 @@ IE8及以下版本的事件系统与DOM不同,模拟事件也就不同.
 任何事件都可以通过构造函数来创建,而非`createEvent()`方法.
 
 # 动画与Canvas图形
+`<canvas>`元素会占据一块页面区域,让JS可以动态在上面绘制图片.`<canvas>`自身提供了一些API,包括基础绘画能力的2D上下文和被称为WebGL的3D上下文.
+
+## 使用requestAnimationFrame
+浏览器通过使用`requestAnimationFrame()`方法告诉浏览器要执行的动画.
+
+### 早期定时动画和问题
+早期定时动画都是通过`setInterval()`来控制动画执行的.但这不能保证事件精度,不能保证任务添加到队列里就会立即执行.此外,浏览器本身计时器精度就不准确.
+
+### requestAnimationFrame
+`window`上的`requestAnimationFrame()`方法优于上述方式的原因是,这个方法能够通知浏览器JS代码要执行动画了,这样浏览器就可以在运行某些代码后进行适当的优化.
+
+该方法接收一个参数,此参数时一个要在重绘屏幕前调用的函数.这个函数就是修改DOM样式以反映下一次重绘有什么变化的地方.为了实现动画循环,可以把多个`requestAnimationFrame()`调用传来你起来:
+````JS
+function updateProgress() {
+    let div = document.getElementById("status");
+    div.style.width = (parseInt(div.style.width, 10) + 5) + "%";
+    if (div.style.left != "100%") {
+        requestAnimationFrame(updateProgress);
+    }
+}
+requestAnimationFrame(updateProgress);
+````
+
+传给`requestAnimationFrame()`的回调函数可以接收一个参数,此参数是一个`DOMHighResTimeStamp`的实例(一个双精度浮点数),表示下次重绘的时间(误差约为5微秒),这一点非常重要,`requestAnimationFrame()`实际上把重绘任务安排在了未来一个已知的时间点上,而且通过这个参数告诉了开发者.要知道现在的时间,可以使用`performance.now()`,该方法也返回一个`DOMHighResTimeStamp`.
+
+**警告：请确保总是使用(回调函数的)第一个参数(或其他一些获取当前时间的方法)来计算动画在一帧中的进度,否则动画在高刷新率的屏幕中会运行得更快**
+
+### cancelAnimationFrame
+`requestAnimationFrame()`也返回一个请求ID,可以用于通过另一个方法`cancelAnimationFrame()`来取消重绘任务:
+````JS
+let requestID = window.requestAnimationFrame(() => {
+    console.log('Repaint');
+});
+window.cancelAnimationFrame(requestID);
+````
+
+### 通过requestAnimationFrame节流
+`requestAnimationFrame`方法跟排期任务有关,浏览器会暴露出作为钩子的回调队列.所谓钩子,就是浏览器在执行下一次重绘之前的一个点.这个回调队列是一个可修改的函数列表,包含应该在重绘之前调用的函数.每次调用`requestAnimationFrame()`都会在队列上推入一个回调函数,队列长度没有限制.
+
+这个回调队列的行为不一定跟动画有关,通过`requestAnimationFrame()`递归地向队列中加入回调函数,可以保证每次重绘最多只调用一次回调函数(虽然下次重绘已经在队列中).
+
+````JS
+let i = 0;
+function sayHi() {
+    console.log("hi");
+    ++i;
+    if (i < 60) requestAnimationFrame(sayHi);
+}
+requestAnimationFrame(sayHi);
+
+console.log("aaa");
+setTimeout(() => { console.log("bbb") }, 40);
+setTimeout(() => { console.log("ccc") }, 100);
+// aaa
+// hi × 2
+// bbb
+// hi × 4
+// ccc
+// hi × 54
+// "hi"不会像直接递归调用一样一下子全部出现
+````
+
+为了让任务不会反复添加到队列中,可以限制重绘的调用:
+````JS
+let enabled = true;
+function expensiveOperation() { // 一个会耗费大量时间的函数
+    console.log('Invoked at', Date.now());
+    // ...
+}
+window.addEventListener('scroll', () => {   // 滑动事件会产生大量消息
+    if (enabled) {    // 节流
+        enabled = false;
+        window.requestAnimationFrame(expensiveOperation);   // 控制浏览器在哪个渲染周期中执行
+        window.setTimeout(() => enabled = true, 50);
+    }
+});
+````
+
+## 基本的画布功能
+创建`<canvas>`元素时至少要设置其`width`和`height`属性,这样才能告诉浏览器在多大面积上绘图.出现在开始和结束标签之间的内容是后备数据,会在浏览器不支持`<canvas>`元素时显示.比如:
+````HTML
+<canvas id="drawing" width="200" height="200"> A drawing of something.</canvas>
+````
+
+`width`和`height`属性也可以在DOM节点上设置,因此可以随时修改.整个元素还可以通过CSS添加样式,并且元素在添加样式或实际绘制内容前是不可见的.
+
+要在画布上绘制图形,首先要取得绘图上下文.使用`getContext()`方法可以获取对绘图上下文的引用.对于平面图形,需要给这个方法传入参数`"2d"`,表示要获取2D上下文对象:
+````JS
+let drawing = document.getElementById("drawing");
+if (drawing.getContext) {   // 测试getContext()是否存在,确保浏览器支持<canvas>,部分浏览器即使不支持<canvas>,上面的表达式依然能够返回结果
+    let context = drawing.getContext("2d");
+}
+````
+
+可以使用`toDataURL()`方法导出`<canvas>`元素上的图像.这个方法接收一个参数:要生成图像的MIME类型(与用来创建图形的上下文无关).例如,要从画布上导出一张PNG格式的图片,可以这样做:
+````JS
+let drawing = document.getElementBy("drawing");
+let imgURI = drawing.toDataURL("image/png");
+let image = document.createElement("img");
+image.src = imgURI;
+document.body.appendChild(image);
+````
+浏览器默认将图像编码为PNG格式,除非另行指定.
+
+如果画布中的图像是其他域绘制过来的,`toDataURL()`方法就会抛出错误.
+
+## 2D绘图上下文
+2D绘图上下文提供了绘制2D图形的方法,包括矩形,弧形和路径.2D上下文的坐标原点`(0,0)`在`<canvas>`元素的左上角.所有坐标值都相对于该点计算,因此x坐标向右增长,y坐标向下增长.默认情况下,`width`和`height`表示两个方向上像素的最大值.
+
+### 填充和描边
+2D上下文有两个基本绘制操作:填充和描边.填充以指定样式(颜色,渐变和图像)自动填充形状,而描边值为图形边界着色.大多数2D上下文操作有填充和描边的变体,显示效果取决于两个属性:`fillStyle`和`strokeStyle`.
+
+这两个属性可以是字符串,渐变对象或图案对象,默认值都为`"#000000"`.字符串表示颜色值,可以是CSS支持的任意格式:名称,十六进制代码,rgb,rgba,hsl或hsla.比如:
+````JS
+let drawing = document.getElementById("drawing");
+let context = drawing.getContext("2d");
+context.strokeStyle = "red";
+context.fillStyle = "#0000ff";
+````
+这两个属性也可以是渐变或图案.
+
+### 绘制矩形
+矩形是唯一一个可以直接在2D绘图上下文中绘制的形状.域绘制矩形相关的方法有3个:`fillRect()`,`strokeRect()`和`clearRect()`.这些方法都接收4个参数:矩形x坐标,矩形y坐标,矩形宽度和矩形高度.这几个参数的单位都是像素.
+
+`fillRect()`方法用于指定颜色在画布上绘制并填充矩形.填充的颜色使用`fillStyle`颜色指定:
+````JS
+let drawing = document.getElementById("drawing");
+let context = drawing.getContext("2d");
+context.fillStyle = "#ff0000";
+context.fillRect(10, 10, 50, 50);
+context.fillStyle = "rgba(0, 0, 255, 0.5)";
+context.fillRect(30, 30, 50, 50);
+````
+
+![fillRect](img/get_start/canvasFillRect.png)
+
+`strokeRect()`方法使用通过`strokeStyle`属性指定的颜色绘制矩形轮廓.例如:
+````JS
+let drawing = document.getElementById("drawing");
+let context = drawing.getContext("2d");
+context.strokeStyle = "#ff0000";
+context.strokeRect(10, 10, 50, 50);
+context.strokeStyle = "rgba(0,0,255,0.5)";
+context.strokeRect(30, 30, 50, 50);
+````
+
+![strokeRect](img/get_start/canvasStrokeRect.png)
+
+描线宽度由`lineWidth`属性控制,它可以是任意整数值.类似地,`lineCap`属性控制线条端点的形状:`"butt"`(平头),`"round"`(圆头)或`"square"`(出方头),而`lineJoin`属性控制线条交点的形状:`"round"`(圆转),`"bevel"`(取平)或`"miter"`(出尖).
+
+使用`clearRect()`方法可以擦除画布中某个区域.该方法用于把绘画上下文的某个区域变透明:
+````JS
+let drawing = document.getElementById("drawing");
+let context = drawing.getContext("2d");
+context.fillStyle = "#ff0000";
+context.fillRect(10, 10, 50, 50);
+context.fillStyle = "rgba(0,0,255,0.5)";
+context.fillRect(30, 30, 50, 50);
+context.clearRect(40, 40, 10, 10);
+````
+
+![clearRect](img/get_start/canvasClearRect.png)
+
+### 绘制路径
+2D绘图上下文支持很多在画布上绘制路径的方法.通过路径可以创建复杂的形状和线条.要绘制路径,必须首先调用`beginPath()`方法以表示要开始绘制新路径.然后,在调用下列方法来绘制路径:
+- `arc(x, y, radius, startAngle, endAngle, counterclockwise)`:以坐标`(x, y)`为圆心,以`radius`为半径绘制一条弧线,起始角度为`startAngle`,结束角度为`endAngle`(都是弧度).最后一个参数`counterclockwise`表示是否逆时针计算起始角度和结束角度(默认为顺时针).
+- `arcTo(x1, y1, x2, y2, radius)`:以给定半径`radius`,经由`(x1, y1)`绘制一条从上一点到`(x2, y2)`的弧线.
+- `bezierCurveTo(c1x, c1y, c2x, c2y, x, y)`:以`(c1x, c1y)`和`(c2x, c2y)`为控制点,绘制一条从上一点到`(x, y)`的弧线(三次贝塞尔曲线).
+- `lineTo(x, y)`:绘制一条从上一点到`(x, y)`的直线.
+- `moveTo(x, y)`:不绘制线条,只把绘制光标移动到`(x, y)`.
+- `quadraticCurveTo(cx, cy, x, y)`:以`(cx, cy)`为控制点,绘制一条从上一点到`(x, y)`的弧线(二次贝塞尔曲线).
+- `rect(x, y, width, height)`:以给定宽度和高度在坐标点`(x, y)`绘制一个矩形.这个方法与`strokeRect()`和`fillRect()`区别在于,它创建的是一条路径,而不是独立的图形.
+
+创建路径之后,可以使用`closePath()`方法绘制一条返回起点的线.如果路径已经完成,则既可以指定`fillStyle`属性并调用`fill()`方法来填充路径,也可以指定`strokeStyle`属性并调用`stroke()`方法来描画路径,还可以调用`clip()`方法基于已有路径创建一个新剪切区域.
+
+例如:
+````JS
+let drawing = document.getElementById("drawing");
+let context = drawing.getContext("2d");
+context.beginPath();
+context.arc(100, 100, 99, 0, 2 * Math.PI, false);
+context.moveTo(194, 100);
+context.arc(100, 100, 94, 0, 2 * Math.PI, false);
+context.moveTo(100, 100);
+context.lineTo(100, 15);
+context.moveTo(100, 100);
+context.lineTo(35, 100);
+context.stroke();
+````
+
+![canvasPath](img/get_start/canvasPath.png)
+
+`isPointInPath()`方法接收x轴和y轴坐标作为参数.这个方法用于确定指定的点是否在路径上,可以在关闭路径前随时调用:
+````JS
+if (isPointInPath(100, 100)) {
+    console.log("Point (100, 100) is in the path.");
+}
+````
+
+### 绘制文本
+文本和图像混合也是常见的绘制需求,因此2D绘图上下文还提供了绘制文本的方法,即`fillText()`和`strokeText()`.这两个方法都接收4个参数:要绘制的字符串,x坐标,y坐标和可选的最大像素宽度.而且,这两个方法最终绘制的结果都却决于以下三个属性:
+- `font`:以CSS语法指定的字体样式,大小,字体族等,比如`"10px Arial"`.
+- `textAlign`:指定文本的对齐方式,可能的值包括`"start"`,`"end"`,`"left"`,`"right"`和`center`.推荐使用`"start"`和`"end"`,不使用`"left"`和`"right"`,因为前者无论在从左到右书写的语言还是从右向左书写的语言中含义都更明确.
+- `textBaseLine`:指定文本的基线,可能的值包括`"top"`,`"hanging"`,`"middle"`,`"alphabetic"`,`"ideographic"`和`"bottom"`.
+
+这些属性都有相应的默认值,因此没必要每次绘制文本时都设置它们.`fillText()`方法使用`fillStyle`属性绘制文本,而`strokeText()`方法使用`strokeStyle`属性.通常`fillText()`方法是使用最多的,因为它模拟了在网页中渲染文本.
+
+例如:
+````JS
+let drawing = document.getElementById("drawing");
+let context = drawing.getContext("2d");
+context.beginPath();
+context.arc(100, 100, 99, 0, 2 * Math.PI, false);
+context.moveTo(194, 100);
+context.arc(100, 100, 94, 0, 2 * Math.PI, false);
+context.moveTo(100, 100);
+context.lineTo(100, 15);
+context.moveTo(100, 100);
+context.lineTo(35, 100);
+context.stroke();
+context.font = "bold 14px Arial";
+context.textAlign = "center";
+context.textBaseline = "middle";
+context.fillText("12", 100, 12);
+````
+
+![canvasText](img/get_start/canvasText.png)
+
+使用`"center"`表示x坐标是文本的中心,使用`"start"`表示在从左到右书写的语言中,x坐标是文本的左侧.同样,`"top"`意味着y坐标是文本的顶部,`"bottom"`表示y坐标是文本的底部,`"hanging"`,`alphabetic`和`ideographic`分别引用字体中特定的基准点.
+
+由于绘制文本很复杂,因此2D上下文提供了用于辅助确定文本大小的`measureText()`方法.这个方法接收一个参数,即要绘制的文本,然后返回一个`TextMetrics`对象,这个对象包含文本的尺寸的属性.[MDN-TextMetrics](https://developer.mozilla.org/zh-CN/docs/Web/API/TextMetrics)
+
+`measureText()`方法使用`font`,`textAlign`和`textBaseline`属性当前的值计算绘制指定文本后的大小.
+
+例如,假设要把文本`"Hello world!"`放到一个140像素宽的矩形中,可以使用以下代码,从100像素的字体大小开始计算,不断递减,知道文本大小合适:
+````JS
+let drawing = document.getElementById("drawing");
+let context = drawing.getContext("2d");
+let fontSize = 100;
+context.font = fontSize + "px Arial";   // measureText()需要依赖font属性来计算
+while (context.measureText("Hello world!").width > 140) {
+    fontSize--;
+    context.font = fontSize + "px Arial";
+}
+context.fillText("Hello world!", 10, 30);
+context.fillText("Font size is " + fontSize + "px", 10, 70);
+````
+
+![canvasHelloWorld](img/get_start/canvasHelloWorld.png)
+
+`fillText()`和`strokeText()`还有第四个参数,即文本的最大宽度.这个参数是可选的.如果调用`fillText()`和`strokeText()`时提供了此参数,但要绘制的字符串超出了最大宽度限制,则文本会以正确的字符高度绘制,但水平会被压缩,以达到限定宽度:
+
+![canvasTextParam4](img/get_start/canvasTextParam4.png)
+
+### 变换
+上下文变换可以操作绘制在画布上的图像.2D绘图上下文支持所有常见的绘制变换.在创建绘制上下文时,会以默认值初始化变换矩阵.从而让绘制操作如实应用到绘制结果上.对绘制上下文应用变换,可以导致以不同的变化矩阵应用绘制操作,从而产生不同的结果.
+
+以下方法可用于变换绘制上下文的变换矩阵:
+- `rotate(angle)`:围绕原点把图像旋转`angle`弧度.
+- `scale(scaleX, scaleY)`:通过在x轴乘以`scaleX`,在y轴乘以`scaleY`来缩放图像.`scaleX`和`scaleY`的默认值都是`1.0`.
+- `translate(x, y)`:把原点移动到`(x, y)`.执行这个操作后,坐标`(0, 0)`就会变成`(x, y)`.
+- `tranform(m1_1, m1_2, m2_1, m2_2, dx, dy)`:通过矩阵乘法直接修改矩阵:
+$$
+\begin{bmatrix}
+m_{_{11} } & m_{_{12} } & dx \\
+m_{_{21} } & m_{_{22} } & dy \\
+0          & 0          & 1  \\
+\end{bmatrix}
+$$
+- `setTransform(m1_1, m1_2, m2_1, m2_2, dx, dy)`:把矩阵重置为默认值,再以传入的参数调用`transform()`.
+
+例如:
+````JS
+let drawing = document.getElementById("drawing");
+let context = drawing.getContext("2d");
+context.beginPath();
+context.arc(100, 100, 99, 0, 2 * Math.PI, false);
+context.moveTo(194, 100);
+context.arc(100, 100, 94, 0, 2 * Math.PI, false);
+context.translate(100, 100);    // 将原点移动到表盘中心
+context.rotate(1);      // 旋转1rad
+context.moveTo(0, 0);
+context.lineTo(0, -85);
+context.moveTo(0, 0);
+context.lineTo(-65, 0);
+context.stroke();
+````
+
+![canvasTransform](img/get_start/canvasTransform.png)
+
+所有这些变换,以及`fillStyle`和`strokeStyle`属性,会一直在上下文中保留,直到再次修改它们.并没有办法能够将它们重置为默认值.但可以通过`save()`方法将这一时刻的设置存放到一个暂存栈中.调用`restore()`方法可以从暂存栈中取出并恢复之前保存的设置:
+````JS
+context.fillStyle = "#ff0000";  // 红色
+context.save();
+
+context.fillStyle = "#00ff00";  // 绿色
+context.translate(100, 100);
+context.save();
+
+context.fillStyle = "#0000ff";  // 蓝色
+context.fillRect(0, 0, 100, 200);   // 在(100, 100)绘制蓝色矩形
+
+context.restore();
+context.fillRect(10, 10, 100, 200); // 在(100, 100)绘制绿色矩形
+
+context.restore();
+context.fillRect(0, 0, 100, 200);   // 在(0, 0)绘制红色矩形
+````
+
+![canvasSaveRestore](img/get_start/canvasSaveRestore.png)
+
+`save()`方法不保存绘图上下文的内容.
+
+### 绘制图像
+2D绘图上下文内置支持操作图像.如果想把现有图像绘制到画布上,可以使用`drawImage()`方法.这个方法接收5族不同的参数,并产生不同的结果.最简单的调用是传入一个HTML的`<img>`元素,以及表示绘制目标的x和y坐标,结果是把图像绘制到指定位置.
+
+如果想改变所绘制图像的大小,可以再传入另外两个参数:目标宽度和目标高度.这只会缩放绘制的图像.
+
+还可以只把图像绘制到上下文中的一个区域.此时,需要给`drawImage()`提供9个参数:要绘制的图像,源图像x坐标,源图像y坐标,源图像宽度,源图像高度,目标区域x坐标,目标区域y坐标,目标区域宽度和目标区域高度.
+
+除了可以是`<img>`元素,还可以是另一个`<canvas>`元素,这样就会把另一个画布的内容绘制到当前画布上.
+
+但如果绘制的图像来自其他域而非当前页面,则不能获取其数据.
+
+### 阴影
+2D上下文可以根据以下属性的值自动为已有形状或路径生成阴影:
+- `shadowColor`:CSS颜色值,表示要绘制的阴影颜色,默认为黑色.
+- `shadowOffsetX`:阴影相对于形状或路径的x坐标偏移量,默认为`0`.
+- `shadowOffsetY`:阴影相对于形状或路径的y坐标偏移量,默认为`0`.
+- `shadowBlur`:像素,表示阴影的模糊量.默认值为`0`,表示不模糊.
+
+例如:
+````JS
+let context = drawing.getContext("2d");
+context.shadowOffsetX = 5;
+context.shadowOffsetY = 5;
+context.shadowBlur = 4;
+context.shadowColor = "rgba(0, 0, 0, 0.5)";
+context.fillStyle = "#ff0000";
+context.fillRect(10, 10, 50, 50);
+context.fillStyle = "rgba(0, 0, 255, 1)";
+context.fillRect(30, 30, 50, 50);
+````
+
+![canvasShadow](img/get_start/canvasShadow.png)
+
+### 渐变
 
