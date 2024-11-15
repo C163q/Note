@@ -680,6 +680,22 @@
     - [绘制图像](#绘制图像)
     - [阴影](#阴影)
     - [渐变](#渐变)
+    - [图案](#图案)
+    - [图像数据](#图像数据)
+    - [合成](#合成)
+  - [WebGL](#webgl)
+    - [WebGL上下文](#webgl上下文)
+    - [WebGL基础](#webgl基础)
+    - [WebGL1与WebGL2](#webgl1与webgl2)
+- [表单脚本](#表单脚本)
+  - [表单基础](#表单基础)
+    - [提交表单](#提交表单)
+    - [重置表单](#重置表单)
+    - [表单字段](#表单字段)
+      - [表单字段的公共属性](#表单字段的公共属性)
+      - [表单字段的公共方法](#表单字段的公共方法)
+      - [表单字段的公共事件](#表单字段的公共事件)
+  - [文本框编程](#文本框编程)
 
 # 认识JavaScript
 `JavaScript`包含: 核心(ECMAScript), 文档对象模型(DOM), 浏览器对象模型(BOM).
@@ -14270,4 +14286,294 @@ context.fillRect(30, 30, 50, 50);
 ![canvasShadow](img/get_start/canvasShadow.png)
 
 ### 渐变
+渐变通过`CanvasGradient`的实例表示.
+
+要创建一个新的线性渐变,可以调用上下文的`createLinearGradient()`方法.这个方法接收4个参数:起点x坐标,起点y坐标,终点x坐标和终点y坐标.调用之后,该方法会以指定大小创建一个新的`CanvasGradient`对象并返回实例.
+
+`gradient`(`CanvasGradient`实例)使用`addColorStop()`方法为渐变指定色标.这个方法接收两个参数:色标位置和CSS颜色字符串.色标位置通过0-1范围的值表示,0是第一种颜色,1是最后一种颜色.
+
+最后,把`gradient`赋值给`fillStyle`或`strokeStyle`属性,从而以渐变填充或描绘绘制的图形:
+````JS
+let drawing = document.getElementById("drawing");
+let context = drawing.getContext("2d");
+let gradient = context.createLinearGradient(30, 30, 70, 70);
+gradient.addColorStop(0, "white");
+gradient.addColorStop(1, "black");
+context.fillStyle = gradient;
+context.fillRect(30, 30, 50, 50);
+````
+
+![canvasCreateLinearGradient](img/get_start/canvasCreateLinearGradient.png)
+
+注意,在调用`createLinearGradient()`时,给出了渐变的范围,因此,如果矩阵没有绘制在给出的渐变范围,则只会显示部分渐变:
+````JS
+context.fillStyle = gradient;
+context.fillRect(50, 50, 50, 50);
+````
+
+![canvasCreateLinearGradientWarn](img/get_start/canvasCreateLinearGradientWarn.png)
+
+径向渐变(或放射性渐变)要使用`createRadialGradient()`方法来创建.这个方法接收6个参数,分别对应两个圆形圆心的坐标和半径.前3个参数指定起点圆形中心的x,y坐标和半径,后3个参数指定终点圆形中心的x,y坐标和半径:
+````JS
+let drawing = document.getElementById("drawing");
+let context = drawing.getContext("2d");
+let gradient = context.createRadialGradient(55, 55, 10, 55, 55, 30);
+gradient.addColorStop(0, "black");
+gradient.addColorStop(1, "white");
+context.fillStyle = gradient;
+context.fillRect(25, 25, 60, 60);
+````
+
+![canvasCreateRadialGradient](img/get_start/canvasCreateRadialGradient.png)
+
+### 图案
+图案是用于填充和描画重复图像.要创建新图案,可以调用`createPattern()`方法并传入两个参数:一个HTML`<img>`元素(或`<video>`元素或另一个`<canvas>`元素)和一个表示该如何重复图像的字符串.第二个参数的值与CSS的`background-repeat`属性是一样的,包括`"repeat"`,`"repeat-x"`,`"repeat-y"`和`"no-repeat"`:
+````JS
+let image = document.images[0],
+    pattern = context.createPattern(image, "repeat");
+context.fillStyle = pattern;
+context.fillRect(10, 10, 150, 150);
+````
+
+![canvasCreatePattern](img/get_start/canvasCreatePattern.png)
+
+### 图像数据
+使用`getImageData()`方法获取原始图像数据.这个方法接收4个参数:要取得数据中第一个像素的左上角坐标和要取得的像素宽度和高度.
+
+返回的对象是一个`ImageData`的实例.每个`ImageData`对象都包含3个属性:`width`,`height`和`data`,其中,`data`属性是包含图像的原始像素信息的数组.每个像素在`data`数组中都由4个值表示,分别代表红,绿,蓝和透明度值.因此,第一个像素的信息包含在第0到第3个值中,第二个像素的信息包含在第4到第7个值中:
+````JS
+let data = imageData.data,
+    red = data[0],
+    green = data[1],
+    blue = data[2],
+    alpha = data[3];
+````
+数组中的每个值都在`0-255`范围内(包括边界).
+
+对原始图像数据进行访问可以更灵活地操作图像,可以见:[How to apply filters in javascript](https://img.ly/blog/how-to-apply-filters-in-javascript/)
+
+注意,如果画布上绘制的是跨域内容,则尝试获取图像数据会导致JS报错.
+
+### 合成
+2D上下文中绘制的所有内容都会应用两个属性:`globalAlpha`和`globalCompositionOperation`,其中,`globalAlpha`属性是一个范围在`[0, 1]`的值,用于指定所有绘制内容的透明度,默认值为0.
+
+`globalCompositionOperation`属性表示新绘制的形状如何与上下文中已有的形状融合.这个属性是一个字符串,可以取下列值:
+- `source-over`:默认值,新图形绘制在原有图形上面.
+- `source-in`:新图形值绘制出与原有图形重叠的部分,画布上其余部分全部透明.
+- `source-out`:新图形值绘制出不与原有图形重叠的部分,画布上其余部分全部透明.
+- `source-atop`:新图形只绘制出与原有图形重叠的部分,原有图形不受影响.
+- `destination-over`:新图形绘制在原有图形下面,重叠部分只有原图形透明像素下的部分可见.
+- `destination-in`:新图形绘制在原有图形下面,画布上只剩下两者重叠部分,其余部分完全透明.
+- `destination-out`:新图形与原有图形重叠的部分完全透明,原图形其余部分不受影响.
+- `destination-atop`:新图形绘制在原有图形下面,原有图形与新图形不重叠的部分完全透明.
+- `lighter`:新图形与原有图形重叠部分的像素值相加,使该部分变亮.
+- `copy`:新图形将擦除并完全取代原有图形.
+- `xor`:新图形与原有图形重叠部分的像素执行异或计算.
+
+详见[MDN-globalCompositeOperation](https://developer.mozilla.org/zh-CN/docs/Web/API/CanvasRenderingContext2D/globalCompositeOperation)
+
+## WebGL
+`WebGL`是画布的3D上下文.与其他Web技术不同,`WebGL`不是W3C制定的标准,而是`Khronos Group`的标准.
+
+要使用`WebGL`最好熟悉`OpenGL ES 2.0`,因为很多概念可以照搬过来.
+
+### WebGL上下文
+`WebGL 2.0`上下文的名字叫`"webgl2"`,`WebGL 1.0`上下文的名字叫`"webgl1"`.如果浏览器不支持WebGL,则尝试访问WebGL上下文会返回`null`.
+````JS
+let drawing = document.getElementById("drawing");
+let gl = drawing.getContext("webgl");
+````
+
+### WebGL基础
+- 常量:常量在`OpenGL`中的名字以`GL_`开头.在WebGL中,`context`对象上的常量则不包含`GL_`前缀.例如,`GL_COLOR_BUFFER_BIT`常量在WebGL中要这样访问`gl.COLOR_BUFFER_BIT`.WebGL以这种方式支持大部分OpenGL常量(少数常量不支持).
+- 方法命名:OpenGL中的很多方法会包含相关的数据类型信息.接收不同类型和不同数量参数的方法,会通过方法名的后缀体现这些信息.表示参数数量的数字在先,表示数据类型的字符串(`f`表示浮点数,`i`表示整数)在后.比如,`gl.uniform4f()`的意思是需要4个浮点数值参数,`gl.uniform3i()`表示需要3个整数值参数.还有很多方法接收数组,这类方法用字母`v`来表示.因此,`gl.uniform3iv()`就是要接收一个包含3个值的数组参数.在编写WebGL代码时,要记住这些约定.
+
+/// TODO
+
+### WebGL1与WebGL2
+`WebGL1`代码几乎完全与`WebGL2`兼容.在使用`WebGL2`上下文时,唯一可能涉及修改代码以保证兼容性的就是扩展.在`WebGL2`中,很多扩展都变成了默认功能.
+
+# 表单脚本
+## 表单基础
+`Web`表单在HTML中以`<form>`元素表示,在JS中则以`HTMLFormElement`类型表示.`HTMLFormElement`类型继承自`HTMLElement`类型,因此拥有与其他HTML元素一样的默认属性.不过,`HTMLFormElement`也有自己的属性和方法:
+- `acceptCharset`:服务器可以接收的字符集,等价于HTML的`accept-charset`属性.
+- `action`:请求的URL,等价于HTML的`action`属性.
+- `elements`:表单中所有控件的`HTMLFormControlsCollection`(不会包含文本等节点)(继承自`HTMLCollection`).
+- `enctype`:请求的编码类型,等价于HTML的`enctype`属性.
+- `length`:表单中控件的数量.
+- `method`:HTTP请求的方法类型,通常是`"get"`或`"post"`,等价于HTML的`method`属性.
+- `name`:表单的名字,等价于HTML的`name`属性.
+- `reset()`:把表单字段重置为各自的默认值.
+- `submit()`:提交表单.
+- `target`:用于发送请求和接收响应的窗口的名字,等价于HTML的`target`属性.
+
+有几个方式可以取得`<form>`元素的引用:
+- `getElementById()`并把表单元素当作一个普通元素给`<form>`指定一个`id`.
+- `document.forms`集合(`HTMLCollection`类型)可以获取页面上所有的表单元素.例如:`let myForm = document.forms["form2"]; // 取得名字为"form2"的表单`
+
+### 提交表单
+表单是通过用户点击提交按钮或图片按钮的方式提交的.提交按钮可以使用`type`属性为`"submit"`的`<input>`或`"<button>"`元素来定义,图片按钮可以使用`type`属性为`"image"`的`<image>`元素来定义:
+````HTML
+<!-- 以下按钮都可以提交它们所在的表单: -->
+
+<!-- 通用提交按钮 -->
+<input type="submit" value="Submit Form">
+
+<!-- 自定义提交按钮 -->
+<button type="submit">Submit Form</button>
+
+<!-- 图片按钮 -->
+<input type="image" src="graphic.gif">
+````
+
+如果表单中有上述任何一个按钮,且焦点在表单中某个控件上,则按回车键也可以提交表单.(`textarea`控件是个例外,当焦点在它上面时,按回车键会换行.)
+
+以这种方式提交表单会在向浏览器发送请求之前触发`submit`事件.这样就提供了一个验证表单数据的机会,可以根据验证结果决定是否真的要提交.阻止这个事件的默认行为可以取消提交表单:
+````JS
+let form = document.getElementById("myForm");
+form.addEventListener("submit", (event) => {
+    event.preventDefault();
+});
+````
+
+调用`preventDefault()`方法可以阻止表单提交.通常,在表单数据无效以及不应该发送到服务器时可以这样处理.
+
+当然,也可以通过编程的方式在JS中调用`submit()`方法来提交表单.可以在任何时候调用这个方法来提交表单,而且表单中不存在提交按钮也不影响表单提交.
+
+通过`submit()`提交表单时,`submit`事件不会触发.
+
+表单提交的一个最大问题时可能会提交两次表单.如果提交表单之后没有什么反映,那么用户可能会多次点击提交按钮.解决这个问题主要有两种方式:在表单提交之后禁用提交按钮,或者通过`submit`事件处理程序取消之后的表单提交.
+
+### 重置表单
+用户单击重置按钮可以重置表单.重置按钮可以使用`type`属性为`"reset"`的`<input>`或`<button>`元素来创建:
+````HTML
+<!-- 通用重置按钮 -->
+<input type="reset" value="Reset Form">
+
+<!-- 自定义重置按钮 -->
+<button type="reset">Reset Form</button>
+````
+这两种按钮都可以重置表单.表单重置后,所有表单字段都会重置回页面第一次渲染时各自拥有的值.如果字段原来是空的,就会变成空的;如果字段有默认值,则恢复为默认值.
+
+用户单击重置按钮重置表单就会触发`reset`事件.这个事件为取消重置提供了机会.例如:
+````JS
+let form = document.getElementById("myForm");
+form.addEventListener("reset", (event) => {
+    event.preventDefault();
+});
+````
+
+重置表单可以通过JS调用`reset()`方法来完成:`form.reset();`
+
+*注意:表单设计中通常不提倡重置表单.实践中几乎没有重置表单的需求.一般来说,提供一个取消按钮,让用户点击返回前一个页面会比恢复表单中所有的默认值来得更直观.*
+
+### 表单字段
+表单元素可以像页面中的其他元素一样使用原生DOM方法来访问.此外,所有表单元素都是表单`elements`属性(元素集合)(不会包含文本等节点)中包含的一个值.这个`elements`集合是一个有序列表,包含对表中所有字段的引用,包括所有`<input>`,`<textarea>`,`<select>`和`<fieldset>`元素.`elements`集合中的每个字段都以它们在HTML标记中出现的次序保存,可以通过索引位置的`name`属性来访问:
+````JS
+let form = document.getElementById("form1");
+// 取得表单中的第一个字段
+let field1 = form.elements[0];
+// 取得表单中名为(或id为)"textbox1"的字段
+let field2 = form.elements["textbox1"];
+// 取得字段的数量
+let fieldCount = form.elements.length;
+````
+
+如果多个表单控件使用了同一个`name`(很常见,因为存在像单选按钮那样的元素),则会返回包含所有同名元素的`HTMLCollection`.
+
+*注意:可以直接通过`form[0]`而非`form.elements[0]`来索引.只不过这种方式是为了向后兼容旧浏览器而提供的,实际开发中应该避免这样使用.*
+
+#### 表单字段的公共属性
+除`<fieldset>`元素以外,所有表单字段都有一组同样的属性.由于`<input>`类型可以表示多种表单字段,因此这些属性只适用于特定类型的字段,除此以外的属性可以在任何表单字段上使用.以下为这些表单字段的公共属性和方法:
+- `disabled`:布尔值,表示表单字段是否禁用.
+- `form`:指针,指向表单字段所属的表单.这个属性是只读的.
+- `name`:字符串,这个字段的名字.
+- `readOnly`:布尔值,表示这个字段是否只读.
+- `tabIndex`:数值,表示这个字段在按`Tab`键时的切换顺序.
+- `type`:字符串,表示字段类型,如`"checkbox"`,`"radio"`等.
+- `value`:要提交给服务器的字段值.对文件输入字段来说,这个属性是只读的,仅包含计算机上某个文件的路径.
+
+这里面除了`form`属性之外,JS可以动态修改任何属性:
+````JS
+let form = document.getElementById("myForm");
+let field = form.elements[0];
+field.value = "Another value";
+console.log(field.form === form);
+field.focus();
+field.disabled = true;
+field.type = "checkbox";    // 改变字段的类型(不推荐,但对<input>来说是可能的)
+````
+
+这种能力的用例为在用户多次点击表单点,禁用表单的提交按钮.可以通过监听`submit`事件来实现:
+````JS
+let form = document.getElementById("myForm");
+form.addEventListener("submit", (event) => {
+    let target = event.target;
+    let btn = target.elements["submit-btn"];
+    btn.disabled = true;
+});
+// 注意:不能使用click事件,原因是不同浏览器的click事件和submit事件先后顺序不同,如果先触发click事件,然后禁用了提交按钮,那么表单就不会提交了.
+````
+
+`type`属性可以用于除了`<fieldset>`之外的任何表单字段.对于`<input>`元素,这个值等于`HTML`的`type`属性值.对于其他元素,这个`type`属性的值按照下面设置:
+- 描述:`值`.`示例HTML`
+- 单选列表:`"select-one"`.`<select>...</select>`
+- 多选列表:`"select-multiple"`.`<select multiple>...</select>`
+- 自定义按钮:`"submit"`.`<button>...</button>`
+- 自定义非提交按钮:`"button"`.`<button type="button">...</button>`
+- 自定义重置按钮:`"reset"`.`<button type="reset">...</button>`
+- 自定义提交按钮:`"submit"`.`<button type="submit">...</button>`
+
+对于`<input>`和`<button>`元素,可以动态修改其`type`属性.但`<select>`元素的`type`属性是只读的.
+
+#### 表单字段的公共方法
+每个表单字段都有两个公共方法:`focus()`和`blur()`.
+
+`focus()`方法把浏览器焦点设置到表单字段,这意味着该字段会变成活动字段并可以响应键盘事件.在页面加载后把焦点定位到表单中第一个字段就是很常见的做法:
+````JS
+window.addEventListener("load", (event) => {
+    document.forms[0].elements[0].focus();
+});
+````
+注意,如果表单中第一个字段是`type`为`"hidden"`的`<input>`元素,或者该字段被CSS属性`display`或`visibility`隐藏了,以上代码就会出错.
+
+HTML5为表单字段增加了`autofocus`布尔属性,支持的浏览器会自动为带有该属性的元素设置焦点,而无须使用JS:
+````HTML
+<input type="text" autofocus>
+````
+在JS中访问表单字段的`autofocus`属性会返回`true`(如果设置了`autofocus`).在不支持的浏览器中,该属性是空字符串(如果设置了`autofocus`).
+
+`blur()`是`focus()`的反向操作,用于从元素上移除焦点.调用`blur()`时,焦点不会转移到任何特定元素,仅仅只是从调用这个方法的元素上移除了.
+
+#### 表单字段的公共事件
+除了鼠标,键盘,变化和HTML事件外,所有字段还支持以下3个事件:
+- `blur`:在字段失去焦点时触发.
+- `change`:在`<input>`和`<textarea>`元素的`value`发生变化且失去焦点时触发,或者在`<select>`元素中选中项发生变化时触发.
+- `focus`:在字段获得焦点时触发.
+
+`blur()`或`focus()`方法被调用也会触发上述的事件.
+
+`blur`和`change`事件的触发先后顺序没有明确的规定,因此不能依赖这两个事件触发的顺序.
+
+例如:
+````JS
+let textbox = document.forms[0].elements[0];
+textbox.addEventListener("focus", (event) => {
+    let target = event.target;
+    if (target.style.backgroundColor != "red") {
+        target.style.backgroundColor = "yellow";
+    }
+});
+textbox.addEventListener("blur", (event) => {
+    let target = event.target;
+    target.style.backgroundColor = /[^\d]/.test(target.value) ? "red" : "";
+});
+textbox.addEventListener("change", (event) => {
+    let target = event.target;
+    target.style.backgroundColor = /[^\d]/.test(target.value) ? "red" : "";
+});
+````
+
+## 文本框编程
+在HTML中有两种表示文本框的方式:单行使用`<input>`元素,多行使用`<textarea>`元素.这两个控件非常相似,大多数时候行为也一样.不过,它们也有非常重要的区别.
 
