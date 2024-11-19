@@ -696,6 +696,32 @@
       - [表单字段的公共方法](#表单字段的公共方法)
       - [表单字段的公共事件](#表单字段的公共事件)
   - [文本框编程](#文本框编程)
+    - [选择文本](#选择文本)
+      - [select事件](#select事件)
+      - [取得选中的文本](#取得选中的文本)
+      - [部分选中的文本](#部分选中的文本)
+    - [输入过滤](#输入过滤)
+      - [屏蔽字符](#屏蔽字符)
+      - [处理剪贴板](#处理剪贴板)
+    - [自动切换](#自动切换)
+    - [HTML5约束验证API](#html5约束验证api)
+      - [必填字段](#必填字段)
+      - [更多输入类型](#更多输入类型)
+      - [输入模式](#输入模式)
+      - [检测有效性](#检测有效性)
+      - [禁用验证](#禁用验证)
+  - [选择框编程](#选择框编程)
+    - [选项处理](#选项处理)
+    - [添加选项](#添加选项)
+    - [移除选项](#移除选项)
+    - [移动和重排选项](#移动和重排选项)
+  - [表单序列化](#表单序列化)
+  - [富文本编辑](#富文本编辑)
+    - [使用contenteditable](#使用contenteditable)
+    - [与富文本交互](#与富文本交互)
+    - [富文本选择](#富文本选择)
+    - [通过表单提交富文本](#通过表单提交富文本)
+- [JavaScript API](#javascript-api)
 
 # 认识JavaScript
 `JavaScript`包含: 核心(ECMAScript), 文档对象模型(DOM), 浏览器对象模型(BOM).
@@ -14398,7 +14424,7 @@ let gl = drawing.getContext("webgl");
 `Web`表单在HTML中以`<form>`元素表示,在JS中则以`HTMLFormElement`类型表示.`HTMLFormElement`类型继承自`HTMLElement`类型,因此拥有与其他HTML元素一样的默认属性.不过,`HTMLFormElement`也有自己的属性和方法:
 - `acceptCharset`:服务器可以接收的字符集,等价于HTML的`accept-charset`属性.
 - `action`:请求的URL,等价于HTML的`action`属性.
-- `elements`:表单中所有控件的`HTMLFormControlsCollection`(不会包含文本等节点)(继承自`HTMLCollection`).
+- `elements`:表单中所有控件的`HTMLFormControlsCollection`(不会包含文本等节点,但包括所有的属于控件的子节点,即使是非直接的)(继承自`HTMLCollection`).
 - `enctype`:请求的编码类型,等价于HTML的`enctype`属性.
 - `length`:表单中控件的数量.
 - `method`:HTTP请求的方法类型,通常是`"get"`或`"post"`,等价于HTML的`method`属性.
@@ -14477,6 +14503,25 @@ let field1 = form.elements[0];
 let field2 = form.elements["textbox1"];
 // 取得字段的数量
 let fieldCount = form.elements.length;
+````
+
+即使控件是非直接子节点,`elements`属性仍然会将其包含在内:
+````HTML
+<form id="myForm">
+    <fieldset>
+        <input type="text" value="bbb">
+    </fieldset>
+    <input type="text" value="aaa" required pattern="\d+">
+</form>
+````
+````JS
+let form = document.getElementById("myForm");
+for (let field of form.elements) {
+    console.log(field);
+}
+// <fieldset>...</fieldset>
+// <input type="text" value="bbb">
+// <input type="text" value="aaa" required="" pattern="\d+">
 ````
 
 如果多个表单控件使用了同一个`name`(很常见,因为存在像单选按钮那样的元素),则会返回包含所有同名元素的`HTMLCollection`.
@@ -14576,4 +14621,545 @@ textbox.addEventListener("change", (event) => {
 
 ## 文本框编程
 在HTML中有两种表示文本框的方式:单行使用`<input>`元素,多行使用`<textarea>`元素.这两个控件非常相似,大多数时候行为也一样.不过,它们也有非常重要的区别.
+
+默认情况下,`<input>`元素显示为文本框,省略`type`属性会以`"text"`作为默认值.然后可以通过`size`属性指定文本框的宽度,这个宽度是以字符数来计量的.而`value`属性用于指定文本框的初始值,`maxLength`属性用于指定文本框允许的最多字符数:
+````HTML
+<input type="text" size="25" maxlength="50" value="initial value">
+````
+
+`<textarea>`元素总是会创建多行文本框.可以使用`rows`属性指定这个文本框的高度,以字符数计量;以`cols`属性指定以字符数计量的文本框宽度,类似于`<input>`元素的`size`属性.与`<input>`不同的是,`<textarea>`的初始值必须包含在`<textarea>`和`</textarea>`之间且不允许在HTML中指定最大的允许字符数:
+````HTML
+<textarea rows="25" cols="5">initial value</textarea>
+````
+
+但是这两种类型的文本框都会在`value`属性中保存自己的内容.通过这个属性,可以读取也可以设置文本模式的值:
+````JS
+console.log(textbox.value);
+textbox.value = "some new value";
+````
+
+最好使用上述`value`属性来读写文本框的属性,而非修改文本节点.
+
+### 选择文本
+两种文本框都支持名为`select()`的方法,此方法用于全部选中文本框中的文本.大多数浏览器在调用`select()`方法后自动将焦点设置到文本框.这个方法不接受参数,可以在任何时候调用:`textbox.select();`
+
+#### select事件
+`select`事件在选中文本框中的文本时,会触发`select`事件.事件的触发时机因浏览器而异.调用`select()`方法也会触发`select`事件.
+
+#### 取得选中的文本
+`selectionStart`和`selectionEnd`这两个属性包含基于0的数值,分别表示文本选区的起点和终点(文本选区起点的偏移量和文本终区的偏移量).可用以下代码取得文本框中选中的文本:
+````JS
+function getSelectedText(textbox) {
+    return textbox.value.substring(textbox.selectionStart,
+                                   textbox.selectionEnd);
+}
+````
+
+#### 部分选中的文本
+`setSelectionRange()`方法接收两个参数:要选择的第一个字符的索引和停止选择的字符的索引:
+````JS
+textbox.value = "Hello world!";
+textbox.setSelectionRange(0, textbox.value.length); // "Hello world!"
+textbox.setSelectionRange(0, 3);    // "Hel"
+````
+
+不过,要是想要看到选择,则必须在调用`setSelectionRange()`之前或之后给文本框设置焦点.
+
+### 输入过滤
+由于文本框默认并未提供什么验证功能,因此必须通过JS来实现这种输入过滤.
+
+#### 屏蔽字符
+可以通过`keypress`事件来屏蔽字符,例如:
+````JS
+// 只允许输入数字
+textbox.addEventListener("keypress", (event) => {
+    if (!/\d/.test(String.fromCharCode(event.charCode)) &&
+        event.charCode > 9 && /* 某些低版本的浏览器可能也会屏蔽像↑这样的方向键等,因此添加 */
+        !event.ctrlKey /* 防止按下Ctrl+C,Ctrl+V等按键时被屏蔽 */ ) {
+        event.preventDefault();
+    }
+});
+````
+
+#### 处理剪贴板
+与剪贴板相关的事件(属于`ClipboardEvent`,继承自`Event`)包括:
+- `beforecopy`**(已弃用)**:复制操作发生前触发.
+- `copy`:复制操作发生时触发.
+- `beforecut`**(已弃用)**:剪切操作发生前触发.
+- `cut`:剪切操作发生时触发.
+- `beforepaste`**(已弃用)**:粘贴操作发生前触发.
+- `paste`:粘贴操作发生时触发.
+
+*注意:`beforecopy`,`beforecut`,`beforepaste`是非标准的,在不同浏览器触发的时机不同.取消这三个事件并不会阻止复制,剪切和粘贴行为.*
+
+要阻止剪贴板行为,必须取消`copy`,`cut`,`paste`事件.
+
+可以在`document`,`window`或者元素上使用剪贴板事件.
+
+该`event`存在`clipboardData`对象,可以获取剪贴板数据.该方法上存在3个方法:
+- `getData()`:从剪贴板检索字符串数据,并接收一个参数,该参数是要检索的数据的格式(是一个`MIME`类型,不过会将`"text"`视为等价于`"text/plain"`).
+- `setData()`:其第一个参数用于指定数据类型(是一个`MIME`类型,但不认可`"text"`类型,需要写成`"text/plain"`),第二个参数是要放到剪贴板上的文本.
+- `clearData()`:删除数据,其第一个参数用于指定删除的数据类型(是一个`MIME`类型,不指定或`""`表示所有数据类型).
+
+例如:
+````JS
+// 确保只有数字才能粘贴到文本框中
+textbox.addEventListener("paste", (event) => {
+    let text = getClipboardText(event);
+    if (!/^\d*$/.test(text)) {
+        event.preventDefault();
+    }
+});
+````
+
+### 自动切换
+JS可以通过很多方式来增强表单字段的易用性.最常用的是在当前字段完成时自动切换到下一个字段.例如收集数据长度已知(比如电话号码)的字段.
+
+例如:
+````HTML
+<!-- 分三段输入电话号码 -->
+<input type="text" name="tel1" id="txtTel1" maxlength="3">
+<input type="text" name="tel2" id="txtTel2" maxlength="3">
+<input type="text" name="tel3" id="txtTel3" maxlength="4">
+````
+
+可以在每个文本框输入到最大允许字符数时自动把焦点切换到下一个文本框:
+````JS
+function tabForward(event) {
+    let target = event.target;
+    if (target.value.length == target.maxLength) {
+        let form = target.form;
+        for (let i = 0, len = form.elements.length; i < len; ++i) {
+            if (form.elements[i] == target) {
+                if (form.elements[i + 1]) {
+                    form.elements[i + 1].focus();
+                }
+                return;
+            }
+        }
+    }
+}
+let inputIds = ["txtTel1", "txtTel2", "txtTel3"];
+for (let id of inputIds) {
+    let id of document.getElementById(id);
+    textbox.addEventListener("keyup", tabForward);
+}
+let textbox1 = document.getElementById("txtTel1");
+let textbox2 = document.getElementById("txtTel2");
+let textbox3 = document.getElementById("txtTel3");
+````
+
+### HTML5约束验证API
+HTML5为浏览器新增了在提交表单前验证数据的能力.这些能力实现了基本的验证,即使JS不可用或加载失败也没关系.这是因为浏览器自身会基于指定的规则进行验证,并在出错时显示适当的错误消息(无须JS).
+
+验证会根据某些条件应用到表单字段.可以使用HTML标记指定对特定字段的约束,然后浏览器会根据这些约束自动执行表单验证.
+
+#### 必填字段
+HTML的`require`属性表示该字段必须有值,否则无法提交表单.这个属性适用于`<input>`,`<textarea>`和`<select>`字段:
+````HTML
+<input type="text" name="username" required>
+````
+
+可以通过JS检测对于元素的`required`属性来判断表单字段是否为必填:
+````JS
+let form = document.getElementById("myForm");
+let field = form.elements["username"];
+console.log(field.required);    // true
+````
+
+还可以使用下面的代码检测浏览器是否支持`required`属性:
+````JS
+console.log("required" in document.createElement("input"));
+````
+
+#### 更多输入类型
+`HTML5`为`<input>`元素增加了几个新的`type`值.这些类型属性不仅表明了字段期待的数据类型,而且也提供了一些默认验证,详见[HTML-type属性](../HTML/get_start.md#type属性).
+
+老版本浏览器会自动将未知类型值设置为`"text"`,因此,如果想要检查浏览器是否支持新的`type`值,可以:
+````JS
+let input = document.createElement("input");
+input.type = "email";
+let isEmailSupported = (input.type == "email");
+````
+
+对于`"number"`,`"range"`,`"datetime"`,`"datetime-local"`,`"date"`,`"month"`,`"week"`和`"time"`这些数值类型,都可以指定`min`属性(最小可能值),`max`属性(最大可能值),`step`属性(步长).
+````HTML
+<!-- 只允许输入0到100中5的倍数 -->
+<input type="number" min="0" max="100" step="5" name="count">
+````
+
+上述属性也可以在JS中通过对应元素的DOM属性来访问和修改.此外,还有两个方法`stepUp()`和`stepDown()`分别接收一个可选的参数:要从当前值加上或减去的数值(不填则为表单类型对应的默认值).
+
+#### 输入模式
+`HTML`的`pattern`属性用于指定一个正则表达式,用户输入的文本必须与之匹配.例如:
+````HTML
+<!-- 限制只能在文本字段中输入数字 -->
+<input type="text" pattern="\d+" name="count">
+````
+
+注意,模式的开头和末尾分别假设有`^`和`$`.这意味着输入内容必须从头到尾都严格与模式匹配.
+
+指定`pattern`属性不会阻止用户输入无效内容.模式会应用到值,然后浏览器会知道值是否有效.
+
+通过元素的`pattern`属性可以读取模式,返回字符串(不是正则表达式类型).
+
+可以使用下面的代码检测浏览器是否支持`pattern`属性:
+````JS
+console.log("pattern" in document.createElement("input"));
+````
+
+#### 检测有效性
+由于上面的约束都不能直接阻止用户的输入,因此必须使用`checkValidity()`方法检测表单中任意给定字段是否有效.有效返回`true`,否则返回`false`,判断条件就是上述的HTML约束.
+
+例如:
+````JS
+if (document.forms[0].elements[0].checkValidity()) {
+    // 字段有效
+} else {
+    // 字段无效
+}
+````
+
+要检测这个表单是否有效,可以直接在表单上调用`checkValidity()`方法.这个方法会在所有字段都有效时返回`true`,有任何字段无效时返回`false`:
+````JS
+if (document.forms[0].checkValidity()) {
+    // 表单有效
+} else {
+    // 表单无效
+}
+````
+
+`validity`属性能够告诉字段为什么有效或无效,其返回`ValidityState`对象,这个对象包含一系列布尔值属性:
+- `customError`:如果设置了`setCustomValidity()`就返回`true`,否则返回`false`.
+- `patternMismatch`:如果字段值不匹配指定的`pattern`属性则返回`true`.
+- `rangeOverflow`:如果字段值大于`max`的值则返回`true`.
+- `rangeUnderflow`:如果字段值小于`min`的值则返回`true`.
+- `stepMisMatch`:如果字段值与`min`,`max`和`step`的值不符合则返回`true`.
+- `tooLong`:如果字段值的长度超过了`maxLength`属性指定的值则返回`true`.
+- `typeMismatch`:如果字段值不是`"email"`或`"url"`要求的格式则返回`true`.
+- `vaild`:如果其他所有属性的值都为`false`则返回`true`.与`checkValidity()`的条件一致.
+- `valueMissing`:如果字段是必填的但没有值则返回`true`.
+
+例如;
+````JS
+if (input.validity /* 检查浏览器是否支持validity属性 */
+    && !input.validity.valid) {
+    if (input.validity.valueMissing) {
+        console.log("Please specify a value.");
+    } else if (input.validity.typeMismatch) {
+        console.log("Please enter an email address.");
+    } else {
+        console.log("Value is invalid.");
+    }
+}
+````
+
+#### 禁用验证
+指定`novalidate`属性可以禁止对表单进行任何验证:
+````HTML
+<form method="post" action="/signup" novalidate>
+    <!-- 表单元素 -->
+</form>
+````
+这个值也可以通过JS属性`noValidate`检索或设置,设置为`true`表示属性存在,设置为`false`表示属性不存在:
+````JS
+document.forms[0].noValidate = true;    // 关闭验证
+````
+
+如果一个表单中有多个提交按钮,那么可以给特定的提交按钮添加`formnovalidate`属性,指定通过该按钮无效验证即可提交表单:
+````HTML
+<form method="post" action="/foo">
+    <!-- 表单元素 -->
+    <input type="submit" value="Regular Submit">
+    <input type="submit" formnovalidate name="btnNoValidate"
+           value="Non-validating Submit">
+</form>
+````
+
+可以使用JS来设置这个值:
+````JS
+document.forms[0].elements["btnNoValidate"].formNoValidate = true;
+````
+
+## 选择框编程
+选择框是使用`<select>`和`<option>`元素创建的.
+
+为方便交互,`HTMLSelectElement`类型在所有表单字段的公共能力之外又提供了以下属性和方法:
+- `add(newOption, relOption)`:在`relOption`之前向控件中添加新的`<option>`.
+- `multiple`:布尔值,表示是否允许多选,等价于HTML的`multiple`属性.
+- `options`:控件中所有`<option>`元素的`HTMLCollection`.
+- `remove(index)`:移除给定位置的选项.
+- `selectedIndex`:选中项基于0的索引值,如果没有选中项则为-1.对于允许多选的列表,始终是第一个选项的索引.
+- `size`:选择框中可见的行数,等价于`HTML`的`size`属性.
+
+选择框的`type`属性可能是`"select-one"`或`"select-multiple"`.
+
+当前选中项根据以下规则决定选择框的`value`属性:
+- 如果没有选择项,则选择框的值是空字符串.
+- 如果有一个选中项,且其`value`属性有值,则选择框的值就是选中项`value`属性的值.即使`value`属性的值是空字符串也是如此.
+- 如果有一个选中项,且其`value`属性没有指定值,则选择框的值是该项的文本内容.
+- 如果有多个选中值,则选择框的值根据前两条规则取得第一个选中项的值.
+
+````HTML
+<select name="location" id="selLocation">
+    <option value="JS">j</option>   <!-- "JS" -->
+    <option value="">a</option>     <!-- "" -->
+    <option>b</option>              <!-- "b" -->
+</select>
+````
+
+每个`<option>`元素在DOM中都由一个`HTMLOptionElement`对象表示.`HTMLOptionElement`类型又拥有以下属性:
+- `index`:选项在`options`集合中的索引.
+- `label`:选项的标签,等价于HTML的`label`属性.
+- `selected`:布尔值,表示是否选中了当前选项.把这个属性设置为`true`会选中当前选项.
+- `text`:选项的文本.
+- `value`:选项的值(等价于HTML的`value`属性).当不存在时,返回`text`的值(IE8之前会返回空字符串).
+
+这只是为了方便而存在这些属性,使用常规的DOM也可以实现读取这些信息,但是效率更低,因此能使用上面的属性就不要使用DOM方法.也不推荐使用DOM的方法修改`<option>`的文本和值.
+
+此外,选择框会在选中一项是立即触发`change`事件,而非在字段失去焦点时触发.
+
+### 选项处理
+
+对于只允许选择一项的选择框,获取选项最简单的方式是选择框的`selectedIndex`属性:
+````JS
+let selectedOption = selectbox.options[selectbox.selectedIndex];
+````
+
+而多选选择框,`selectedIndex`只会返回第一项,且修改`selectedIndex`会移除其他所有选项,只选择指定的项.
+
+可以通过访问每个选项的`selected`来判断该项是否被选中.此外,在多选选择框中,修改`selected`不会影响其他选项.在单选选择框中,将一项设定为`true`会将其他项移除,设定为`false`则对其他项没有影响.
+
+### 添加选项
+可以使用JS动态创建选项并将它们添加到选择框.
+
+可以使用DOM方法:
+````JS
+let newOption = document.createElement("option");
+newOption.appendChild(document.createTextNode("Option text"));
+newOption.setAttribute("value", "Option value");
+// 上面的三行代码也可以使用Option的构造函数创建,其接收两个参数:text和value.其中,value是可选的.
+// let newOption = new Option("Option text", "Option value");
+selectbox.appendChild(newOption);
+````
+
+除了使用`appendChild()`,还可以使用选择框的`add()`方法.该方法接收两个参数:要添加的新选项和要添加到其前面的参考选项.如果想添加选项到选择框末尾,那么第二个参数应该是`null`.由于IE8中想要添加到选择框末尾,必须不传入参数,所以为了兼容,可以向第二个参数传递`undefined`.
+
+例如:
+````JS
+let newOption = new Option("Option text", "Option value");
+selectbox.add(newOption, null);
+````
+
+### 移除选项
+可以使用DOM的`removeChild()`方法并传入要移除的选项:
+````JS
+selectbox.removeChild(selectbox.options[0]);    // 移除第一项
+````
+
+第二种方式是使用选择框的`remove()`方法.这个方法接收一个参数,即要移除选项的索引:
+````JS
+selectbox.remove(0);
+````
+
+也可以直接将选项设置为等于`null`:
+````JS
+selectbox.options[0] = null;
+````
+
+要清除所有选项,可以这么写:
+````JS
+function clearSelectbox(selectbox) {
+    for (let option of selectbox.options) {
+        selectbox.remove(0);    // 因为移除第一项会自动将所有选项向前移一位,所以这样就可以移除所有选项
+    }
+}
+````
+
+### 移动和重排选项
+使用DOM从一个选择框将一个选项移动到另一个选择框时,只要对相应的选项使用`appendChild()`(或`insertBefore()`)方法即可.因为对于已经存在于DOM树的结点,调用`appendChild()`会将结点先移出DOM树,然后再插入指定位置:
+````JS
+let selectbox1 = document.getElementById("selLocations1");
+let selectbox2 = document.getElementById("selLocations2");
+selectbox2.appendChild(selectbox1.options[0]);
+````
+
+重排也是一样:
+````JS
+let optionToMove = selectbox.options[1];
+selectbox.insertBefore(optionToMove,
+                       selectbox.options[optionToMove.index - 1]);
+// 将一个选项在选择框中前移一个位置
+// options超出索引范围会返回null,所以如果是第一个选项会导致insertBefore()的第二参数为null,会插入到最后一个
+````
+
+## 表单序列化
+表单在JS中可以使用表单字段的`type`属性连同其`name`属性和`value`属性来进行序列化.
+
+浏览器如何确定在提交表单时要把什么发送到服务器:
+- 字段名和值是URL编码的并以和号(&)分隔.
+- 禁用字段不会发送.
+- 复选框或单选按钮只在被选中时才发送.
+- 类型为`"reset"`或`"button"`的按钮不会发送.
+- 多选字段的每个选中项都有一个值.
+- 通过点击提交按钮提交表单时,会发送该提交按钮;否则,不会发送提交按钮.类型为`"image"`的`<input>`元素视同提交按钮.
+- `<select>`元素的值是被选中`<option>`元素的`value`属性.如果`<option>`元素没有`value`属性,则该值是它的文本.
+
+所谓序列化,就是使用JS模拟浏览器发送到服务器的内容.表单序列化通常不包含任何按钮,因为序列化得到的字符串很可能以其他方式提交.除此以外其他规则都应该遵循.
+
+表单序列化代码如下:
+````JS
+// 返回查询字符串格式
+function serialize(form) {
+    let parts = [];
+    let optValue;
+    for (let field of form.elements) {
+        switch (field.type) {
+            case "select-one":
+            case "select-multiple":
+                if (field.name.length) {    // 排除没有名字的字段
+                    for (let option of field.options) {
+                        if (option.selected) {
+                            if (option.hasAttribute) {
+                                optValue = (option.hasAttribute("value") ?
+                                            option.value : option.text);
+                            } else {    // 兼容IE8
+                                optValue = (option.attributes["value"].specified ?
+                                            option.value : option.text);
+                            }
+                            parts.push(`${encodeURIComponent(field.name)}` + "=" +
+                                       `${encodeURIComponent(optValue)}`);
+                        }
+                    }
+                }
+                break;
+            case undefined: // 字段集`<fieldset>`元素
+            case "file":    // 文件输入
+            case "submit":  // 提交按钮
+            case "reset":   // 重置按钮
+            case "button":  // 自定义按钮
+                break;
+            case "radio":   // 单选按钮
+            case "checkbox":    // 复选框
+                if (!field.checked) {
+                    break;
+                }
+            default:
+                if (field.name.length) {    // 排除没有名字的表单字段
+                    parts.push(`${encodeURIComponent(field.name)}=` +
+                               `${encodeURIComponent(field.value)}`);
+                }
+        }
+    }
+    return parts.join("&");
+}
+````
+
+## 富文本编辑
+`<iframe>`允许将另一个HTML文件嵌入其中.通过其JS属性`designMode`,可以让这个嵌入页面(`<body>`)可编辑.`designMode`属性有两个可能的值:`"off"`(默认值)和`"on"`.设置为`"on"`时,整个文档都会变成可以编辑的(显示插入光标).也可以像使用文字处理程序一样编辑文本,通过键盘将文本标记为粗体,斜体等.
+
+例如:
+````HTML
+<iframe name="richedit" style="height: 100px; width: 100px;"></iframe>
+<!-- 可以使用src属性指定显示的URL -->
+````
+````JS
+// window.frames返回所有的直接子窗口
+frames["richedit"].document.designMode = "on";
+````
+
+### 使用contenteditable
+给元素指定HTML枚举属性`contenteditable`,可以让元素可以被用户编辑,即使没有`<iframe>`和JavaScript.
+
+其属性值必须为下面值之一:
+- `true`或空字符串,表示元素是可编辑的.
+- `false`表示元素不是可编辑的.
+- `plaintext-only`表示元素的原始文本是可编辑的,但富文本格式会被禁用.
+
+例如:
+````HTML
+<div class="editable" id="richedit" contenteditable></div>
+<!-- contenteditable后面什么也没有,所以被视作是空字符串 -->
+````
+
+也可以使用元素的JS属性`contentEditable`来设置元素的可编辑状态:
+````JS
+div.contentEditable = "true";
+````
+
+*访问伪URL`data:text/html,<html contenteditable>`可以把浏览器窗口转换为一个记事本.*
+
+### 与富文本交互
+**`document.execCommend()`已弃用**
+
+与富文本编辑器交互的主要方法是使用`document.execCommand()`.这个方法在文档上执行既定的命令,可以实现大多数格式化任务.`document.execCommand()`可以接收3个参数:要执行的命令,表示浏览器是否为命令提供用户界面的布尔值和执行命令必需的值(如果不需要则为`null`).
+
+可用的命令详见:[MDN-execCommand](https://developer.mozilla.org/zh-CN/docs/Web/API/Document/execCommand#%E5%91%BD%E4%BB%A4)
+
+例如:
+````JS
+// 在内嵌窗格中为内容添加<h1>标签
+frames["richedit"].document.execCommand("formatblock", false, "<h1>");
+// 为页面中添加了contenteditable属性的元素创建指向www.example.com的链接
+document.execCommand("createlink", false, "https://www.example.com");
+````
+
+**`queryCommandEnabled()`已弃用**
+
+使用`document.queryCommandEnabled()`可以确定对当前选中文本或光标所在位置是否可以执行相关命令.它只接受一个参数,即要检查的命令名.如果可编辑区可以执行该命令就返回`true`,否则返回`false`.
+
+**`queryCommandState()`已弃用**
+
+使用`document.queryCommandState()`可以确定相关命令是否应用到了当前文本选区.例如,要确定当前选区的文本是否为粗体:
+````JS
+let isBold = frames["richedit"].document.queryCommandState("bold");
+````
+
+**`queryCommandValue()`为非标准**
+使用`document.queryCommandValue()`可以返回执行命令时使用的值,即`execCommand()`中的第三个参数.
+
+### 富文本选择
+*`getSelection()`也可以不使用在富文本当中.*
+
+在内嵌窗格中使用`getSelection()`方法,可以获得富文本编辑器的选区.这个方法暴露在`document`和`window`对象上,返回表示当前选中文本的`Selection`对象.每个`Selection`对象都拥有以下属性:
+- `anchorNode`:选区开始的节点.
+- `anchorOffset`:在`anchorNode`中,从开头到选区开始跳过的字符数.
+- `focusNode`:选区结束的节点.
+- `focusOffset`:`focusNode`中包含在选区内的字符数.
+- `isCollapsed`:布尔值,表示选区起点和终点是否在同一个地方.
+- `rangeCount`:选区中包含的DOM范围数量.
+
+`Selection`提供了以下方法来操作选区:
+- `addRange(range)`:把给定的DOM范围添加到选区.
+- `collapse(node, offset)`:将选区折叠到给定节点中给定的文本偏移处.
+- `collapseToEnd()`:将选区折叠到终点.
+- `collapseToStart()`:将选区折叠到起点.
+- `containsNode(node)`:确定给定节点是否包含在选区中.
+- `deleteFromDocument()`:从文档中删除选区文本.
+- `extend(node, offset)`:通过将`focusNode`和`focusOffset`移动到指定值来扩展选区.
+- `getRangeAt(index)`:返回选区中指定索引处的DOM范围.
+- `removeAllRanges()`:从选区中移除所有DOM范围.这实际上会移除选区,因为选区中至少要包含一个范围.
+- `removeRange(range)`:从选区中移除指定的DOM范围.
+- `selectAllChildren(node)`:清除选区并选择给定节点的所有子节点.
+- `toString()`:返回选区中的文本内容.
+
+使用例:
+````JS
+let selection = frames["richedit"].getSelection();
+let range = getRangeAt(0);
+let span = frames["richedit"].document.createElement("span");
+span.style.backgroundColor = "yellow";
+range.surroundContents(span);
+````
+
+### 通过表单提交富文本
+因为富文本编辑是在内嵌窗格中或通过为元素指定`contenteditable`属性实现的,而不是在表单控件中实现,所以富文本编辑技术上与表单没有关系.这意味着要把富文本编辑的结果提交给服务器,必须手动提取HTML并自己提交.通常的解决方案是在表单中添加一个隐藏字段,使用内嵌窗格或`contenteditable`元素的HTML更新它的值:
+````JS
+form.addEventListener("submit", (event) => {
+    let target = event.target;
+    target.elements["comments"].value = frames["richedit"].document.body.innerHTML;
+});
+````
+
+# JavaScript API
 
