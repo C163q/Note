@@ -722,6 +722,31 @@
     - [富文本选择](#富文本选择)
     - [通过表单提交富文本](#通过表单提交富文本)
 - [JavaScript API](#javascript-api)
+  - [Atomics与SharedArrayBuffer](#atomics与sharedarraybuffer)
+    - [SharedArrayBuffer](#sharedarraybuffer)
+    - [原子操作基础](#原子操作基础)
+  - [跨上下文消息](#跨上下文消息)
+  - [Encoding API](#encoding-api)
+    - [文本编码](#文本编码)
+      - [批量编码](#批量编码)
+      - [流编码](#流编码)
+    - [文本编码](#文本编码-1)
+      - [批量解码](#批量解码)
+      - [流解码](#流解码)
+  - [File API与Blob API](#file-api与blob-api)
+    - [File类型](#file类型)
+    - [FileReader类型](#filereader类型)
+    - [FileReaderSync类型](#filereadersync类型)
+    - [Blob与部分读取](#blob与部分读取)
+      - [对象URL与Blob](#对象url与blob)
+    - [读取拖放文件](#读取拖放文件)
+  - [媒体元素](#媒体元素)
+    - [属性](#属性-2)
+    - [事件](#事件-1)
+    - [自定义媒体播放器](#自定义媒体播放器)
+    - [检测编解码器](#检测编解码器)
+    - [音频类型](#音频类型)
+  - [原生拖放](#原生拖放)
 
 # 认识JavaScript
 `JavaScript`包含: 核心(ECMAScript), 文档对象模型(DOM), 浏览器对象模型(BOM).
@@ -15162,4 +15187,423 @@ form.addEventListener("submit", (event) => {
 ````
 
 # JavaScript API
+## Atomics与SharedArrayBuffer
+多个上下文访问`SharedArrayBuffer`时,如果同时对缓冲区执行操作,就可能出现资源争用问题.`Atomics API`通过强制同一时刻只能对缓冲区执行一个操作,可以让多个上下文安全地读写一个`SharedArrayBuffer`.
+
+### SharedArrayBuffer
+`SharedArrayBuffer`与`ArrayBuffer`具有相同的API,两者的主要区别是`ArrayBuffer`必须在不同执行的上下文间切换,`SharedArrayBuffer`则可以被任意多个执行上下文同时使用.
+
+多个执行上下文间共享内容意味着并发线程操作成为了可能,但会导致资源竞争:
+````JS
+const workerScript = `
+self.onmessage = ({data}) => {
+    const view = new Uint32Array(data);
+    for (let i = 0; i < 1E6; ++i) {
+        // 线程不安全加操作会导致资源竞争
+        view[0] += 1;
+    }
+    self.postMessage(null);
+};
+`;
+const workerScriptBlobUrl = URL.createObjectURL(new Blob([workerScript]));
+const workers = [];
+for (let i = 0; i < 4; ++i) {
+    workers.push(new Worker(workerScriptBlobUrl));
+}
+let responeCount = 0;
+for (const worker of workers) {
+    workers.onmessage = () => {
+        if (++responseCount == workers.length) {
+            console.log(`Final buffer value: ${view[0]}`);
+        }
+    };
+}
+const sharedArrayBuffer = new SharedArrayBuffer(4);
+const view = new Uint32Array(sharedArrayBuffer);
+view[0] = 1;
+for (const worker of workers) {
+    worker.postMessage(sharedArrayBuffer);
+}
+// (期待结果为4000001)
+// 可能的结果:
+// Final buffer value: 2145106
+````
+
+### 原子操作基础
+
+/// TODO
+
+## 跨上下文消息
+跨文档消息,有时候也简称为XDM(cross-document messaging),是一种在不同执行上下文(如不同工作线程或不同源的页面)间传递信息的能力.
+
+XDM的核心是`postMessage()`方法,处理XDM,这个方法名还在HTML5中存在,但目的都一样,都是把数据传送到另一个位置.
+
+`postMessage()`方法接收3个参数:消息,表示目标接收源的字符串(非常重要,用于限制浏览器交付数据的目标)和可选的可传输对象的数组(只与工作线程相关):
+````JS
+let iframeWindow = document.getElementById("myframe").contentWindow;
+iframeWindow.postMessage("A secret", "https://www.example.com");
+````
+
+上面的第二个代码向内嵌窗格中发送一条信息,而且指定了源必须是`"https://www.example.com"`.如果源匹配,那么信息将会交付到窗格;否则,`postMessage()`什么也不做.这个限制可以保护消息不会因地址改变而泄露.如果不想限制接收的目标,则第二个参数可以传递`"*"`.
+
+接收到XMD消息后,`window`对象上会触发`message`事件,这个事件是异步触发的,因此从消息发出到消息接收(接收窗口触发`message`事件)可能有延迟.传给`onmessage`事件处理程序的`event`对象(`MessageEvent`类型)包含以下额外属性:
+- `data`:作为第一个参数传递给`postMessage()`的字符串数据.
+- `origin`:发送消息的文档源,例如`"https://www.example.com"`
+- `source`:发送消息的文档中`window`对象的代理.这个代理对象主要用于发送上一条消息的窗口中执行`postMessage`.如果发送窗口有相同的源,那么这个对象应该就是`window`对象.
+
+借助`origin`,可以保证数据来自正确的地方:
+````JS
+window.addEventListener("message", (event) => {
+    if (event.origin == "https://www.example.com") {
+        processMessage(event.data);
+        event.source.postMessage("Received", "https://somewhere.com");
+    }
+});
+````
+
+大多数情况下,`source`是某个`window`对象的代理,而非实际的`window`对象.因此不能通过它访问窗口下的信息.最好只使用`postMessage()`,这个方法永远存在且可以调用.
+
+第一个参数如果不是字符串,会被[结构化克隆算法](https://developer.mozilla.org/zh-CN/docs/Web/API/Web_Workers_API/Structured_clone_algorithm)序列化.也可以使用`JSON.stringify()`类型转换为字符串,然后在`onmessage`事件处理程序中调用`JSON.parse()`.
+
+## Encoding API
+`Encoding API`主要用于实现字符串与定型数组之间的转换.规范新增了4个用于执行转换的全局类:`TextEncoder`,`TextEncoderStream`,`TextDecoder`和`TextDecoderStream`.
+
+### 文本编码
+`Encoding API`提供了两种将字符串转换为定型二进制格式的方法:批量编码和流编码.把字符串转换为定型数组,编码器始终使用`UTF-8`.
+
+#### 批量编码
+所谓批量,指的是JS引擎会同步编码整个字符串.对于比较长的字符串,可能会花较长时间.批量编码是通过`TextEncoder`的实例完成的.
+
+该实例上有一个`encode()`方法,该方法接收一个字符串参数,并以`Uint8Array`格式返回每个字符的UTF-8编码:
+````JS
+const textEncoder = new TextEncoder();
+const decodedText = 'foo';
+const encodedText = textEncoder.encode(decodedText);
+// f的UTF-8编码是0x66(102)
+// o的UTF-8编码是0x6F(111)
+console.log(encodedText);   // Uint8Array(3) [102, 111, 111]
+````
+
+编码器实例还有一个`encodeInto()`方法,该方法接收一个字符串和目标`Uint8Array`(传入其他类型会抛出错误),返回一个字典(普通的`Object`),该字典包含`read`和`written`属性,分别表示成功从源字符串读取了多少字符和向目标数组写入了多少字符.如果空间不够,编码就会提前终止,返回的字典就会体现这个结果,该方法比`encode()`更加高效:
+````JS
+const textEncoder = new TextEncoder();
+const fooArr = new Uint8Array(3);
+const barArr = new Uint8Array(2);
+const fooRes = textEncoder.encodeInto('foo', fooArr);
+const barRes = textEncoder.encodeInto('bar', barArr);
+console.log(fooArr);    // UintArray(3) [102, 111, 111]
+console.log(fooRes);    // { read: 3, written: 3 }
+console.log(barArr);    // UintArray(2) [98, 97]
+console.log(barRes);    // { read: 2, written: 2 }
+````
+
+#### 流编码
+`TextEncoderStream`其实就是`TransformStream`形式的`TextEncoder`.将解码后的文本流通过管道输入流编码器会得到编码后文本块的流:
+````JS
+async function* chars() {
+    const decodedText = 'foo';
+    for (let char of decodedText) {
+        yield await new Promise((resolve) => setTimeout(resolve, 1000, char));
+    }
+}
+
+const decodedTextStream = new ReadableStream({
+    async start(controller) {
+        for await (let chunk of chars()) {
+            controller.enqueue(chunk);
+        }
+        controller.close();
+    }
+});
+
+const encodedTextStream = decodedTextStream.pipeThrough(new TextEncoderStream());
+const readableStreamDefaultReader = encodeTextStream.getReader();
+
+(async function() {
+    while (true) {
+        const { done, value } = await readableStreamDefaultReader.read();
+        if (done) {
+            break;
+        } else {
+            console.log(value);
+        }
+    }
+})();
+// Uint8Array[102]
+// Uint8Array[111]
+// Uint8Array[111]
+````
+
+### 文本编码
+`Encoding API`提供了两种将定型数组转换为字符串的方式:批量解码和流解码.与编码器类不同,在将定性数组转换为字符串是,编码器支持非常多的字符串编码.默认字符编码是UTF-8.
+
+#### 批量解码
+批量解码是通过`TextDecoder`的实例完成的:
+
+这个实例上有一个`decode()`方法,该方法接收一个定型数组参数,返回解码后的字符串:
+````JS
+const textDecoder = new TextDecoder();
+const encodedText = Uint8Array.of(102, 111, 111);
+const decodedText = textDecoder.decode(encodedText);
+console.log(decodedText);   // foo
+````
+
+即使传入的不是`Uint8Array`也没有关系,解码只会关心整个二进制表示.
+
+想要使用其他解码可以在构造函数中传入编码格式:
+````JS
+const textDecoder = new TextDecoder('utf-16');
+````
+
+#### 流解码
+`TextDecoderStream`是`TransformStream`形式的`TextDecoder`.将编码后的文本流通过管道输入流解码器会得到解码后的文本块的流:
+````JS
+async function* chars() {
+    const encodedText = [102, 111, 111].map((x) => Uint8Array.of(x));
+    for (let char of encodedText) {
+        yield await new Promise((resolve) => setTimeout(resolve, 1000, char));
+    }
+}
+const encodedTextStream = new ReadableStream({
+    async start(controller) {
+        controller.enqueue(chunk);
+    }
+    controller.close();
+});
+
+const decodedTextStream = encodedTextStream.pipeThrough(new TextDecoderStream());
+const readableStreamDefaultReader = decodedTextStream.getReader();
+
+(async function() {
+    while (true) {
+        const { done, value } = await readableStreamDefaultReader.read();
+
+        if (done) {
+            break;
+        } else {
+            console.log(value);
+        }
+    }
+})();
+// f
+// o
+// o
+````
+
+文本编码器能够识别可能分散在不同块上的代理对.解码器流会保持块片段直到取得完整的字符.
+
+文本解码器流经常与`fetch()`一起使用,因为响应体可以作为`ReadableStream`来处理:
+````JS
+const response = await fetch(url);
+const stream = response.body.pipeThrough(new TextDecoderStream());
+const decodedStream = stream.getReader();
+for await (let decodedChunk of decodedStream) {
+    console.log(decodedChunk);
+}
+````
+
+## File API与Blob API
+`File API`与`Blob API`是为了让Web开发者能以安全的方式访问客户端机器上的文件,从而更好地与这些文件交互而设计.
+
+### File类型
+`File API`仍然以表单中的文件输入字段为基础,但是增加了直接访问文件信息的能力.HTML5在DOM上为文件输入元素添加了`files`集合.当用户在文件字段中选择一个或多个文件时,这个`files`集合中会包含一组`File`(继承自`Blob`)对象,表示选中的文件.每个`File`对象都有一些只读属性:
+- `name`:本地系统中的文件名
+- `size`:以字节计的文件大小
+- `type`:包含文件MIME类型的字符串
+- `lastModifiedDate`:表示文件最后修改时间的字符串
+
+可以监听`change`事件然后遍历`files`集合可以取得每个选中文件的信息:
+````JS
+let filesList = document.getElementById("files-list");
+filesList.addEventListener("change", (event) => {
+    let files = event.target.files,
+        i = 0,
+        len = files.length;
+    while (i < len) {
+        const f = files[i];
+        console.log(`${f.name}, ${f.size} bytes`);
+        i++;
+    }
+});
+````
+
+### FileReader类型
+`FileReader`类型表示一种异步文件读取机制.`FileReader`类型提供了几个读取文件数据的方法:
+- `readAsText(file, encoding)`:从文件中读取纯文本内容并保存在对象的`result`属性中.第二个参数表示编码,是可选的.
+- `readAsDataURL(file)`:读取文件并将内容的数据URI保存在`result`属性中.
+- `readAsBinaryString(file)`:读取文件并将二进制数据保存在`result`属性中.
+- `readAsArrayBuffer(file)`:读取文件并将文件内容以`ArrayBuffer`形式保存在`result`属性中.
+
+例如,为了向用户显示图片,可以将图片读取为数据URI,而为了解析文本内容,可以将文件读取为文本.
+
+这些方法是异步的,每个`FileReader`会发布几个事件,包括:`progress`,`error`和`load`.
+
+`progress`事件(`ProgressEvent`类型)在文件读取时每50毫秒触发一次,其包含`lengthComputable`,`loaded`和`total`属性.此外,也可以读取未完成的`FileReader`的`result`属性,即使其中尚未包含全部数据.
+
+`error`事件会在由于某种原因无法读取文件时触发.触发`error`事件时,`FileReader`的`error`属性会包含错误信息.这个属性是一个对象,只包含一个属性:`code`.这个错误码的值可能是`1`(未找到文件),`2`(安全错误),`3`(读取被中断),`4`(文件不可读),`5`(编码错误).
+
+`load`事件会在文件成功加载后触发.如果`error`事件被触发,则不会再触发`load`事件.
+
+如果想提前结束文件读取,则可以在过程中调用`abort()`方法,从而触发`abort`事件.在`load`,`error`或`abort`事件触发后,还会触发`loadend`事件.该事件表示在上述3种情况下,所有读取操作都已经结束.
+
+### FileReaderSync类型
+`FileReaderSync`类型是`FileReader`的同步版本.这个类型拥有与`FileReader`相同的方法,只有在整个文件加载到内存之后才会继续执行.`FileReaderSync`只在工作线程中可用,因为如果读取整个文件耗时太长则会影响全局.
+
+### Blob与部分读取
+某些情况下,可能需要读取部分文件而不是整个文件,为此,需要使用`File`对象的`slice()`方法,这个方法接收两个参数,起始的字节和要读取的字节数.这个方法返回一个`Blob`实例.
+
+`Blob`表示二进制大对象,是JS对不可修改二进制数据的封装类型.包含字符串的数组,`ArrayBuffers`,`ArrayBufferViews`,甚至其他`Blob`都可以用来创建`Blob`实例.`Blob`构造函数可以接收一个`options`参数,并在其中指定`MIME`类型:
+````JS
+console.log(new Blob(['foo']));
+// Blob {size: 3, type: ""}
+console.log(new Blob(['{"a": "b"}'], {type: 'application/json'}));
+// Blob {size: 10, type: "application/json"}
+console.log(new Blob(['<p>Foo</p>', '<p>Bar</p>'], {type: "text/html"}));
+// Blob {size: 20, type: "text/html"}
+````
+
+`Blob`对象有一个`size`属性和一个`type`属性,还有一个`slice()`方法用于进一步切分数据.另外也可以使用`FileReader`从`Blob`中读取数据:
+````JS
+let filesList = document.getElementById("files-list");
+fileList.addEventListener("change", (event) => {
+    let files = event.target.files,
+        reader = new FileReader(),
+        blob = blobSlice(files[0], 0, 32);
+    if (blob) {
+        reader.readAsText(blob);
+        reader.onload = function() {
+            output.innerHTML = reader.result;
+        }
+    }
+})
+````
+
+#### 对象URL与Blob
+对象URL有时候也称作Blob URL,是指引用存储在`File`或`Blob`中数据的URL.对象URL的优点是不用把文件内容读取到JS也可以使用文件.只要在适当位置提供对象URL即可.要创建对象URL,可以使用`window.URL.createObjectURL()`方法并传入`File`或`Blob`对象.这个函数返回的值是一个指向内存中地址的字符串.因为这个字符串是URL,所以可以在DOM中直接使用:
+````JS
+let files = document.getElementById("files-list").files,
+    url = window.URL.createObjectURL(files[0]);
+if (url && /image/.test(files[0].type)) {
+    output.innerHTML = `<img src=${url}>`;
+}
+````
+
+使用完数据之后,最好能释放与之关联的内存.只要对象URL在使用中,就不能释放内存.如果想表明不再使用某个对象URL,则可以把它传给`window.URL.revokeObjectURL()`以释放与之关联的内存.页面卸载时会自动释放对象URL占用的内存.
+
+### 读取拖放文件
+在页面上创建放置目标后,可以从桌面上把文件拖放并放到放置目标.这样会像拖放图片或链接一样触发`drop`事件.被放置的文件可以通过事件的`event.dataTransfer.files`属性读到,这个属性保存着一组`File`对象:
+````JS
+let droptarget = document.getElementById("droptarget");
+function handleEvent(event) {
+    let files, i, len;
+    event.preventDefault();
+    if (event.type == "drop") {
+        files = event.dataTransfer.files;
+        i = 0;
+        len = files.length;
+        while (i < len) {
+            console.log(`${files[i].name}  ${files[i].type}, ${files[i].size} bytes`);
+            i++;
+        }
+    }
+}
+droptarget.addEventListener("dropenter", handleEvent);
+droptarget.addEventListener("dropover", handleEvent);
+droptarget.addEventListener("drop", handleEvent);
+````
+
+## 媒体元素
+`<audio>`和`<video>`为浏览器提供了嵌入音频和视频的统一解决方案.
+
+详见[HTML-audio](../HTML/get_start.md#audio)和[HTML-video](../HTML/get_start.md#video)
+
+### 属性
+`<video>`和`<audio>`元素提供了JS接口.这两个元素有很多共有属性(`HTMLMediaElement`实例,`HTMLVideoElement`和`HTMLAudioElement`都继承它),可以用于确定媒体的当前状态:
+- `autoplay`:`Boolean`.取得或设置HTML`autoplay`标签.
+- `buffered`:`TimeRanges`对象.表示已下载缓冲的时间范围.
+- `bufferedBytes`**(未查到)**:`ByteRanges`对象.表示已下载缓冲的字节范围.
+- `bufferingRate`**(未查到)**:`Integer`:平均每秒下载的位数.
+- `bufferingThrottled`**(未查到)**:`Boolean`.表示缓冲是否被浏览器截流.
+- `controls`:`Boolean`.取得或设置HTML`controls`属性.
+- `currentLoop`:`Integer`.媒体已经播放的循环次数.
+- `currentSrc`:`String`.当前播放媒体的URL.
+- `currentTime`:`Float`.已经播放的秒数.
+- `defaultPlaybackRate`:`Float`.取得或设置默认播放速率.默认为`1.0`秒.
+- `duration`:`Float`.媒体的总秒数.
+- `ended`:`Boolean`.表示媒体是否播放完成.
+- `loop`:`Boolean`.取得或设置媒体是否应该在播放完成再循环开始.
+- `muted`:`Boolean`.取得或设置媒体是否静音.
+- `networkState`:`Integer`.表示媒体当前网络状态.`0`表示空,`1`表示加载中,`2`表示加载元数据,`3`表示加载了第一帧,`4`表示加载完成.
+- `paused`:`Boolean`.表示播放器是否暂停.
+- `playbackRate`:`Float`.取得或设置当前播放速率.将`playbackRate`设为负值**不可以**实现倒播.用户可以调整该属性而无法调整`defaultPlaybackRate`.
+- `played`:`TimeRanges`.到目前为止已经播放的时间范围.
+- `readyState`:`Integer`.表示媒体是否已经准备就绪.`0`表示媒体不可用,`1`表示可以显示当前帧,`2`表示媒体可以开始播放,`3`表示媒体可以从头播到尾.
+- `seekable`:`TimeRanges`.可以跳转的时间范围.
+- `seeking`:`Boolean`.表示播放器正在移动到媒体文件的新位置.
+- `src`:`String`.媒体文件源.可以在任何时候重写.
+- `start`:`Float`.取得或设置媒体文件中的位置,以秒为单位,从该处开始播放
+- `totalBytes`:`Integer`.资源需要的字节总数(如果知道的话).
+- `videoHeight`(`HTMLVideoElement`):`Integer`.返回视频(不一定是元素)的高度.
+- `videoWidth`(`HTMLVideoElement`):`Integer`.返回视频(不一定是元素)的宽度.
+- `volume`:`Float`.取得或设置当前音量,值为`0.0`到`1.0`.
+
+### 事件
+媒体元素包含以下事件:
+- `abort`:下载被中断.
+- `canplay`:播放可以开始,但未完全缓冲,`readyState`为`2`.
+- `canplaythrough`:播放可以开始,且已经完全缓冲,`readyState`为`3`.
+- `canshowcurrentframe`**(未查到)**:已经下载当前帧,`readyState`为`1`.
+- `dataunavailable`**(未查到)**:不能播放,因为没有数据,`readyState`为`0`.
+- `durationchange`:`duration`属性的值发生变化.
+- `emptied`:网络连接关闭了.
+- `empty`:发生了错误,阻止媒体下载.
+- `ended`:媒体已经播放完,且停止了.
+- `error`:下载期间发生了网络错误.
+- `loadeddata`:媒体的第一帧已经下载.
+- `loadedmetadata`:媒体的元数据已经下载.
+- `loadstart`:下载已经开始.
+- `pause`:播放已经暂停
+- `play`:媒体已经收到开始播放的请求.
+- `playing`:媒体已经实际开始播放了.
+- `progress`:下载中.
+- `ratechange`:媒体播放速率发生变化.
+- `seeked`:跳转已结束.
+- `seeking`:播放已移动到新位置.
+- `stalled`:浏览器尝试下载,但尚未收到数据.
+- `timeupdate`:`currentTime`被非常规或意外地更改了.
+- `volumechange`:`volume`或`muted`属性值发生了变化.
+- `waiting`:播放暂停,以下载更多数据.
+
+### 自定义媒体播放器
+使用`<audio>`和`<video>`的`play()`和`pause()`方法,可以手动控制媒体文件的播放.综合使用属性,事件和这些方法,可以方便地创建自定义的媒体播放器.
+
+(不过还是建议从现成的代码直接修改)
+
+### 检测编解码器
+不是所有浏览器都支持`<video>`和`<audio>`的所有编解码器,这通常意味着必须提供多个媒体源.为此,也有JS API可以用来检测浏览器是否支持给定格式和编解码器.这两个媒体元素都有一个名为`canPlayType()`的方法,该方法接收一个格式/编解码器字符串,返回一个字符串值:`"probably"`,`"maybe"`或`""`,其中空字符串就是假值,因此可以在条件判断中直接使用:
+````JS
+if (audio.canPlayType("audio/mpeg")) {
+    // ...
+}
+````
+最有可能返回的值是`"maybe"`和`""`.这是因为文件实际上只是一个包装音频和视频的容器,而真正决定文件是否可以播放的是编码.在同时提供MIME类型和编解码器的情况下,返回值的可能性会提高到`"probably"`:
+````JS
+if (audio.canPlayType("audio/ogg; codecs=\"vorbis\"")) {
+    // ...
+}
+````
+注意:编解码器必须放到引号中.
+
+### 音频类型
+`<audio>`元素还有一个名为`Audio`的原生JS构造函数,支持在任何时候播放音频.`Audio`实例不需要插入文档即可工作.
+
+可选的`url`参数传入指定的音频源文件的URL:
+````JS
+let audio = new Audio("sound.mp3");
+audio.addEventListener("canplaythrough", (event) => {
+    event.target.play();
+});
+````
+
+## 原生拖放
 
