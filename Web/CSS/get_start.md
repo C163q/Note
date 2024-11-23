@@ -1744,7 +1744,7 @@ CSS可分为三种样式表:
 1. 新建一个后缀为`.css`的样式文件,里面写入样式(不写HTML标签).
 2. 在HTML页面中,使用`<link>`标签引入这个文件. 语法为: `<link rel="stylesheet" href="css文件路径">`
 
-例如: <br>
+例如:  
 **try.html文件:**
 ````HTML
 <!DOCTYPE html>

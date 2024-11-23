@@ -747,6 +747,81 @@
     - [检测编解码器](#检测编解码器)
     - [音频类型](#音频类型)
   - [原生拖放](#原生拖放)
+    - [可拖动能力](#可拖动能力)
+    - [拖动事件](#拖动事件)
+    - [自定义放置目标](#自定义放置目标)
+    - [dataTransfer对象](#datatransfer对象)
+    - [dropEffect与effectAllowed](#dropeffect与effectallowed)
+    - [其他成员](#其他成员)
+  - [Notifications API](#notifications-api)
+    - [通知权限](#通知权限)
+    - [显示和隐藏通知](#显示和隐藏通知)
+    - [通知生命周期回调](#通知生命周期回调)
+  - [Page Visibility API](#page-visibility-api)
+  - [Stream API](#stream-api)
+    - [理解流](#理解流)
+      - [块,内部队列和反压](#块内部队列和反压)
+    - [可读流](#可读流)
+      - [ReadableStreamDefaultController](#readablestreamdefaultcontroller)
+      - [ReadableStreamDefaultReader](#readablestreamdefaultreader)
+    - [可写流](#可写流)
+      - [创建WritableStream](#创建writablestream)
+      - [WritableStreamDefaultWriter](#writablestreamdefaultwriter)
+    - [转换流](#转换流)
+    - [通过管道连接流](#通过管道连接流)
+  - [计时API](#计时api)
+    - [High Resolution Time API](#high-resolution-time-api)
+    - [Performance Timeline API](#performance-timeline-api)
+      - [User Timing API](#user-timing-api)
+      - [Navigation Timing API](#navigation-timing-api)
+      - [Resource Timing API](#resource-timing-api)
+  - [Web组件](#web组件)
+    - [HTML模板](#html模板)
+      - [使用DocumentFragment](#使用documentfragment)
+      - [使用`<template>`标签](#使用template标签)
+      - [模板脚本](#模板脚本)
+    - [影子DOM](#影子dom)
+      - [理解影子DOM](#理解影子dom)
+      - [创建影子DOM](#创建影子dom)
+      - [使用影子DOM](#使用影子dom)
+      - [合成与影子DOM槽位](#合成与影子dom槽位)
+      - [事件重定向](#事件重定向)
+    - [自定义元素](#自定义元素)
+      - [创建自定义元素](#创建自定义元素)
+      - [使用自定义元素生命周期方法](#使用自定义元素生命周期方法)
+      - [升级自定义元素](#升级自定义元素)
+  - [Web Cryptography API](#web-cryptography-api)
+    - [生成随机数](#生成随机数)
+    - [使用SubtleCrypto对象](#使用subtlecrypto对象)
+      - [生成密码学摘要](#生成密码学摘要)
+      - [CryptoKey与算法](#cryptokey与算法)
+      - [生成CryptoKey](#生成cryptokey)
+- [错误处理与调试](#错误处理与调试)
+  - [浏览器错误报告](#浏览器错误报告)
+    - [桌面控制台](#桌面控制台)
+    - [移动控制台](#移动控制台)
+  - [错误处理](#错误处理)
+    - [try/catch语句](#trycatch语句)
+      - [finally子句](#finally子句)
+      - [错误类型](#错误类型)
+    - [抛出错误](#抛出错误)
+    - [error事件](#error事件)
+    - [识别错误](#识别错误)
+      - [静态代码分析器](#静态代码分析器)
+      - [类型转换错误](#类型转换错误)
+      - [数据类型错误](#数据类型错误)
+      - [通信错误](#通信错误)
+    - [区分重大与非重大错误](#区分重大与非重大错误)
+    - [把错误记录到服务器中](#把错误记录到服务器中)
+  - [调试技术](#调试技术)
+    - [把消息记录到控制台](#把消息记录到控制台)
+    - [理解控制台运行时](#理解控制台运行时)
+    - [使用JS调试器](#使用js调试器)
+    - [在页面中打印消息](#在页面中打印消息)
+    - [补充控制台方法](#补充控制台方法)
+    - [抛出错误](#抛出错误-1)
+  - [旧版IE的常见错误](#旧版ie的常见错误)
+- [处理XML](#处理xml)
 
 # 认识JavaScript
 `JavaScript`包含: 核心(ECMAScript), 文档对象模型(DOM), 浏览器对象模型(BOM).
@@ -8344,7 +8419,7 @@ sayName("bbb");     // bbb
 sayName();          // aaa
 sayName(undefined); // aaa
 ````
-`arguments`不反应参数的默认值,只反映传给函数的参数.此外,对于含有默认值的命名参数,修改命名参数不会影响`arguments`对象:
+`arguments`不反映参数的默认值,只反映传给函数的参数.此外,对于含有默认值的命名参数,修改命名参数不会影响`arguments`对象:
 ````JS
 function sayName(name = "aaa") {
     name = "bbb";
@@ -15606,4 +15681,1327 @@ audio.addEventListener("canplaythrough", (event) => {
 ````
 
 ## 原生拖放
+- [MDN-HTML 拖放 API](https://developer.mozilla.org/zh-CN/docs/Web/API/HTML_Drag_and_Drop_API)
+- [MDN-拖拽操作](https://developer.mozilla.org/zh-CN/docs/Web/API/HTML_Drag_and_Drop_API/Drag_operations)
+
+拖放可以跨窗格,跨浏览器容器,甚至跨应用程序拖动元素.
+
+### 可拖动能力
+默认情况下,图片,链接和文本是可拖动的,这意味着无须额外代码用户就可以拖动它们.文本只有在被选中后才可以拖动,而图片和链接在任意时候都是可以拖动的.
+
+也可以使用`HTML`的*枚举*属性(**不是**布尔属性)`draggable`让其他元素变得可以拖动.设置为`"true"`表示可以拖动,`"false"`表示不能拖动.图片和链接的`draggable`属性默认为`"true"`,而其他元素默认为`"false"`.
+
+````HTML
+<img src="smile.gif" draggable="false">
+<div draggable="true">...</div>
+````
+
+### 拖动事件
+在某个事件被拖动时,会(按顺序)触发以下事件:
+- `dragstart`
+- `drag`
+- `dragend`
+
+在按住鼠标键不放并开始移动鼠标的那一刻,被拖动元素上会触发`dragstart`事件.此时光标会变成非放置符号(圆环中间一条斜杠),表示元素不能放到自身上.`dragstart`事件触发后,只要目标还被拖动就会持续触发`drag`事件(即使鼠标不移动也会不断触发).当拖动停止时(把元素放到有效或无效放置目标上),会触发`dragend`事件.
+
+上述3个事件的目标都是被拖动的元素.默认情况下,浏览器在拖动开始后不会改变被拖动元素的外观.不过,大多数浏览器此时会创建元素的一个半透明副本,始终跟随在光标下方.
+
+在把元素拖动到一个有效的放置目标上时,放置目标会依次触发以下事件:
+- `dragenter`
+- `dragover`
+- `dragleave`或`drop`
+
+只要一把元素拖动到放置目标上,`dragenter`事件就会触发.`dragenter`事件触发后,会立即触发`dragover`事件,并且在元素在放置目标范围内被拖动期间此事件会持续触发.当元素被拖动到放置目标之外,`dragover`停止触发,`dragleave`事件触发.如果被拖动元素被放到目标上,则会触发`drop`事件而不是`dragleave`事件.这些事件的目标时放置目标元素.
+
+### 自定义放置目标
+在把某个元素拖动到无效放置目标上时,光标会显示为禁止.即使所有元素都支持放置目标事件,这些元素默认也是不允许放置的.但可以通过覆盖`dragenter`和`dragover`事件的默认行为,可以把任何元素转换为有效的放置目标.此时,元素上就可以触发`drop`事件.
+
+无效放置目标的放置事件的默认行为是导航到放在放置目标上的URL.要阻止这个行为,需要取消`drop`事件的默认行为.
+
+````HTML
+<p id="dragfrom" draggable="true">This text <strong>may</strong> be dragged.</p>
+<div id="myDiv" style="height: 100px; width: 100px; background-color: blue;"></div>
+````
+
+````JS
+let dragfrom = document.getElementById("dragfrom");
+let dragto = document.getElementById("myDiv");
+dragto.addEventListener("dragover", (event) => {
+    event.preventDefault();
+});
+dragto.addEventListener("dragenter", (event) => {
+    event.preventDefault();
+});
+dragto.addEventListener("drop", (event) => {
+    event.preventDefault();
+})
+````
+
+### dataTransfer对象
+除非数据受影响,否则简单的拖放并没有实际意义.为实现拖放操作中的数据传输,可以使用`event`对象(属于`DragEvent`,继承自`MouseEvent`)的`dataTransfer`属性(`DataTransfer`类型).该属性是一个对象,包含两个主要方法:`getData()`和`setData()`.`getData()`用于获取`setData()`存储的值.`setData()`的第一个参数以及`getData()`的唯一参数是一个字符串,表示要设置的数据类型:`"text/plain"`(`"text"`以兼容旧版)或`"text/uri-list"`(`"URL"`以兼容旧版)(也可以是其他MIME类型?).`setData()`的第二个参数是一个字符串,表示要存储的数据.
+
+可以同时存储`text`和`URL`(和其他MIME类型),不会相互覆盖.如果没有在`drop`事件中获取这些数据,`dataTransfer`对象就会被销毁,数据也会丢失.
+
+在从文本框拖动文本时,浏览器会自动调用`setData()`并将文本以`text`格式存储起来.当拖动链接或图片时,浏览器会调用`setData()`并以`URL`的形式储存起来.
+
+以`URL`形式存储时,放在浏览器空白处可能会导航到该URL.
+
+`getData()`读取失败会返回一个空字符串.
+````JS
+let url = event.dataTransfer.getData("url");
+````
+
+### dropEffect与effectAllowed
+`dataTransfer`对象不仅可以用于实现简单的数据传输,还可以用于确定能够对被拖放元素和放置目标执行什么操作.为此,可以使用`dropEffect`和`effectAllowed`.
+
+`dropEffect`属性可以告诉浏览器允许哪种放置行为,这是拖动(放置)目标的限制(结果).这个属性有以下4种可能的值:
+- `"none"`:被拖动元素可能不能放到这里.这是除文本框以外所有元素的默认值.(真正是否可以拖放还与`effectAllowed`有关)
+- `"move"`:被拖放元素应该移动到放置目标.
+- `"copy"`:被拖放元素应该复制到放置目标.
+- `"link"`:表示放置目标会导航到被拖动元素(仅在它是URL的情况下).
+
+为了使用`dropEffect`属性,必须在放置目标的`dragenter`事件处理程序中设置它.
+
+`effectAllowed`属性表示对被拖放元素是否允许`dropEffect`,这是拖动元素的限制.这个属性有如下几个可能的值:
+- `uninitialized`:没有给被拖放元素设置动作.
+- `none`:被拖放元素上没有允许的动作.
+- `copy`:只允许`"copy"`这种`dropEffect`.
+- `link`:只允许`"link"`这种`dropEffect`.
+- `move`:只允许`"move"`这种`dropEffect`.
+- `copyLink`:只允许`"copy"`和`"link"`两种`dropEffect`.
+- `copyMove`:只允许`"copy"`和`"move"`两种`dropEffect`.
+- `linkMove`:只允许`"link"`和`"move"`两种`dropEffect`.
+- `all`:允许所有`dropEffect`.
+
+必须在`dragstart`事件处理程序中设置这个属性.
+
+`DataTransfer`还拥有`files`等属性.
+
+### 其他成员
+`DataTransfer`还有以下方法:
+- `clearData(format)`:清除以特定格式存储的数据.
+- `setDragImage(element, x, y)`:允许指定拖动发生时显示在光标下面的图片.这个方法接收3个参数:要显示的HTML元素以及标识光标位置的图片上的x和y坐标.这里的HTML元素可以是一张图片,也可以是其他任何元素,此时显示渲染后的元素.
+- `type`:当前存储的数据类型列表.这个集合类似数组,以字符串形式保存数据类型,比如`"text"`.
+
+## Notifications API
+`Notifications API`用于向用户显示通知.通知使用JS API触发页面外部的浏览器行为,允许页面处理用户与对话框或弹层的交互.其在`Service Worker`中非常有用.渐进Web应用通过触发通知可以在页面不活跃时向用户显示消息,看起来就像原生应用.
+
+### 通知权限
+`Notifications API`有被滥用的可能,因此默认会开启两项安全措施:
+- 通知只能在运行安全上下文代码中被触发.
+- 通知必须按照每个源的原则明确得到用户允许.
+
+用户授权显示通知是通过浏览器内部的一个对话框完成的.除非用户没有明确给出允许或拒绝的答案,否则这个权限请求对每个域只会出现一次.浏览器会记住用户的选择.
+
+页面可以使用全局对象`Notification`向用户请求通知权限.这个对象有一个`requestPermission()`方法,该方法返回一个期约,用户在授权对话框上执行操作后这个期约会解决.
+
+````JS
+Notification.requestPermission().then((permission) => {
+    console.log('User responded to permission request:', permission);
+});
+````
+
+`"granted"`值意味着用户明确授权了显示通知的权限.除此以外的其他值意味着显示通知会静默失败.如果用户拒绝授权,这个值就是`"denied"`.一旦拒绝,就无法通过编程方式挽回,因为不可能再触发授权提示.
+
+### 显示和隐藏通知
+`Notification`构造函数用于创建和显示通知.最简单的通知形式是只显示一个标题,这个标题内容可以作为第一个参数传给`Notification`构造函数.可以通过`options`参数(一个`Object`对象)对通知进行自定义,包括设置通知的主体,图片和振动等:
+````JS
+const n = new Notification('Title text!', {
+    body: 'Body text!', // 通知主体
+    image: 'path/to/image.png', // 通知图片
+    vibrate: true   // 是否振动
+});
+setTimeout(() => n.close(), 1000);  // 1秒后关闭显示的通知
+````
+可以使用对象的`close()`方法关闭显示的通知.
+
+### 通知生命周期回调
+通知(`Notification`)拥有以下4个事件:
+- `show`:在通知显示时触发
+- `click`:在通知点击时触发
+- `close`:在通知消失或通过`close()`关闭时触发
+- `error`:在发生错误阻止通知显示时触发
+
+## Page Visibility API
+`Page Visibility API`旨在为开发者提供页面对用户是否可见的信息(页面是否被最小化或隐藏在其他标签后面).
+
+- `document.visibilityState`值,表示以下3种状态之一:
+  - `"visible"`:此时页面内容至少是部分可见.即此页面在前景标签页中,并且窗口没有最小化.
+  - `"hidden"`:此时页面对用户不可见.即文档处于背景标签页或者窗口处于最小化状态,或者操作系统正处于锁屏状态.
+  - `"prerender"`:页面此时正在渲染中,因此是不可见的.文档只能从此状态开始,永远不能从其他值变为此状态.
+- `visibilitychange`事件,该事件会在文档从隐藏变可见(或反之)时触发.
+- `document.hidden`布尔值 **(后向兼容)**,表示页面是否被隐藏.这意味着页面在后台标签页或浏览器被最小化了.
+
+## Stream API
+深入了解流,详见[数据流-权威指南](https://web.dev/articles/streams)
+
+`Stream API`用于消费有序的小信息块.
+
+这种能力主要有两种应用场景:
+- 大块信息可能不会一次性都可用.网络请求就是一个典型的例子.流式处理可以让应用在数据已到达就能使用,而不必等到所有数据都加载完毕.
+- 大块数据可能需要小部分处理.视频处理,数据压缩,图像编码和JSON解析都是可以分成小部分进行处理,而不必等到所有数据都在内存中时再处理.
+
+### 理解流
+提到流,可以把数据想象成某种通过管道输送的液体.JS中的流借用了管道相关的概念,因为原理是相通的.
+
+`Stream API`定义了3种流:
+- 可读流:可以通过某个公共接口读取数据块的流.数据在内部从底层源进入流,然后由消费者进行处理.
+- 可写流:可以通过某个公共接口写入数据块的流.生产者将数据写入流,数据在内部传入底层数据槽.
+- 转换流:由两种流组成,可写流用于接收数据(可写端),可读流用于输出数据(可读流).这两个流之间是转换程序,可以根据需要检查和修改流的内容.
+
+**注意:不是说是可读流接收后传入可写流并处理.可读流和可写流是可以独立存在的.**
+
+#### 块,内部队列和反压
+流的基本单位是**块**.块可以是任意数据类型,但通常是定型数组.每个块都是离散的流片段,可以作为一个整体来处理.块不是固定大小的,也不一定按固定间隔到达.在理想的流中,块的大小近似相同,到达间隔近似相等.流可能需要考虑边界情况.
+
+各种类型的流都有入口和出口的概念.有时候,由于进出速率不同,可能会出现不匹配的情况.有以下三种情况:
+- 流出口处理数据的速度比入口提供数据的速度快.流出口经常空闲,但只会浪费一点内存或计算资源,因此这是可以接受的.
+- 流入和流出均衡.这是理想状态.
+- 流入口提供数据的速度比出口处理数据速度快.这种流不平衡是固有的问题.此时一定会在某个地方出现数据积压,流必须响应做出处理.
+
+流为上述第三种情况提供了解决的工具.所有流都会为已进入流但尚未离开流的块提供一个内部队列,用于均衡流.但如果内部队列不断增大,它会使用**反压**,通知流入口停止发送数据,知道队列大小降到某个既定的阈值之下.这个阈值由排列策略决定,这个策略定义了内部队列可以占用的最大内存,即高水位线.
+
+### 可读流
+可读流是对底层数据源的封装.底层数据源可以将数据填充到流中,允许消费者通过流的公共接口读取数据.
+
+#### ReadableStreamDefaultController
+要让值通过可读流的控制器传入可读流,需要创建一个`ReadableStream`实例,并在构造函数的`underlyingSource`参数(第一个参数)中定义`start()`方法,然后在这个方法中使用作为参数传入的`controller`.默认情况下,这个控制器参数是`ReadableStreamDefaultController`的一个实例,其包含`enqueue()`方法可以把值传入控制器.所有值都传完之后,调用其`close()`关闭流.
+
+示例见下.
+
+#### ReadableStreamDefaultReader
+要从队列中读出值,需要`ReadableStreamDefaultReader`的实例,该实例可以通过流的`getReader()`方法获取.调用这个方法会获得流的锁(带锁的`ReadableStreamDefaultReader`实例),保证只有这个读取器可以从流中读取值.然后消费者使用这个读取器实例的`read()`方法可以读出值.
+
+其中`read()`方法返回一个`Promise`,其可能状态如下:
+- 如果有分块可用,则`promise`将使用`{ value: theChunk, done: false }`形式的对象来兑现.
+- 如果流已经关闭,则`promise`将使用`{ value: undefined, done: true }`形式的对象来兑现.
+- 如果流发生错误,`promise`将因相关错误被拒绝.
+
+示例:
+````JS
+async function* ints() {
+    // 每1秒生成一个递增的整数
+    for (let i = 0; i < 5; ++i) {
+        yield await new Promise((resolve) => setTimeout(resolve, 1000, i));
+    }
+}
+const readableStream = new ReadableStream({
+    async start(controller) {
+        for await (let chunk of ints()) {
+            controller.enqueue(chunk);
+        }
+        controller.close();
+    }
+});
+console.log(readableStream.locked); // false
+const readableStreamDefaultReader = readableStream.getReader(); // 返回的是ReadableStreamDefaultReader的实例
+console.log(readableStream.locked); // true
+
+// 消费者
+(async function() {
+    while (true) {
+        const { done, value } = await readableStreamDefaultReader.read();   // 使用对象解构,如果流发生错误,await会立刻结束异步函数
+        if (done) {
+            break;
+        } else {
+            console.log(value);
+        }
+    }
+})();
+// 0
+// 1
+// 2
+// 3
+// 4
+````
+
+### 可写流
+可写流是底层数据槽的封装.底层数据槽处理通过流的公共接口写入的数据.
+
+#### 创建WritableStream
+将值通过可写流的公共接口可以写入流.在传给`WritableStream`构造函数的`underlyingSink`参数(第一个参数)中,通过实现`write()`方法可以获得写入的数据.
+
+示例见下.
+
+#### WritableStreamDefaultWriter
+要把获得的数据写入流,可以通过流的`getWriter()`方法获取`WritableStreamDefaultWriter`的实例.这样会获得流的锁,确保只有一个写入器可以向流中写入数据.
+
+在向流中写入数据前,生产者必须确保写入器可以接收值.`writableStreamDefaultWriter.ready`返回一个期约,此期约会在能够向流中写入数据时解决.然后,就可以把值传给`WritableStreamDefaultWriter.write()`方法.写入数据后,调用其`close()`方法将流关闭.
+
+示例:
+````JS
+async function* ints() {
+    for (let i = 0; i < 5; ++i) {
+        yield await new Promise((resolve) => setTimeout(resolve, 1000, i));
+    }
+}
+const writableStream = new WritableStream({
+    write(value) {
+        console.log(value);
+    }
+});
+console.log(writableStream.locked); // false
+const writableStreamDefaultWriter = writableStream.getWriter();
+console.log(writableStream.locked); // true
+
+// 生产者
+(async function() {
+    for await (let chunk of ints()) {
+        await writableStreamDefaultWriter.ready;
+        writableStreamDefaultWriter.write(chunk);
+    }
+    writableStreamDefaultWriter.close();
+})();
+````
+
+### 转换流
+转换流用于组合可读流和可写流.数据块在两个流之间的转换是通过`transform()`方法完成的.数据进入`TransformStream`对象的可写流写入对象,然后通过可读流从对象中读出.
+
+示例:
+````JS
+async function* ints() {
+    // 每1秒生成一个递增的整数
+    for (let i = 0; i < 5; ++i) {
+        yield await new Promise((resolve) => setTimeout(resolve, 1000, i));
+    }
+}
+// 通过transform()方法将每个值翻倍
+// 返回的TransformStream包含writable和readable,分别表示由TransformStream控制的ReadableStream和WritableStream
+const { writable, readable } = new TransformStream({
+    transform(chunk, controller) {
+        controller.enqueue(chunk * 2);
+    }
+});
+const readableStreamDefaultReader = readable.getReader();
+const writableStreamDefaultWriter = writable.getWriter();
+
+// 消费者
+(async function() {
+    while (true) {
+        const { done, value } = await readableStreamDefaultReader.read();   // 使用对象解构,如果流发生错误,await会立刻结束异步函数
+        if (done) {
+            break;
+        } else {
+            console.log(value);
+        }
+    }
+})();
+// 生产者
+(async function() {
+    for await (let chunk of ints()) {
+        await writableStreamDefaultWriter.ready;
+        writableStreamDefaultWriter.write(chunk);
+    }
+    writableStreamDefaultWriter.close();
+})();
+````
+
+### 通过管道连接流
+流可以通过管道连接成一串.最常见的用例是使用`pipeThrough()`方法把`ReadableStream`接入`TransformStream`.从内部看,`ReadableStream`先把自己的值传给`TransformStream`内部的`WritableStream`,然后执行转换,接着转换后的值又在新的`ReadableStream`上出现.
+
+例如:
+````JS
+async function* ints() {
+    // 每1秒生成一个递增的整数
+    for (let i = 0; i < 5; ++i) {
+        yield await new Promise((resolve) => setTimeout(resolve, 1000, i));
+    }
+}
+const integerStream = new ReadableStream({
+    async start(controller) {
+        controller.enqueue(chunk);
+    }
+    controller.close();
+});
+const doublingStream = new TransformStream({
+    transform(chunk, controller) {
+        controller.enqueue(chunk * 2);
+    }
+});
+
+// 通过管道连接流
+const pipedStream = integerStream.pipeThrough(doublingStream);
+// 从连接流的输出获得读取器
+const pipedStreamDefaultReader = pipedStream.getReader();
+
+// 消费者
+(async function() {
+    while (true) {
+        const { done, value } = await pipedStreamDefaultReader.read();  // 使用对象解构,如果流发生错误,await会立刻结束异步函数
+        if (done) {
+            break;
+        } else {
+            console.log(value);
+        }
+    }
+})();
+// 0
+// 2
+// 4
+// 6
+// 8
+````
+
+使用`pipeTo()`方法可以将`ReadableStream`连接到`WritableStream`:
+````JS
+async function* ints() {
+    // 每1秒生成一个递增的整数
+    for (let i = 0; i < 5; ++i) {
+        yield await new Promise((resolve) => setTimeout(resolve, 1000, i));
+    }
+}
+const integerStream = new ReadableStream({
+    async start(controller) {
+        controller.enqueue(chunk);
+    }
+    controller.close();
+});
+const writableStream = new WritableStream({
+    write(value) {
+        console.log(value);
+    }
+});
+const pipedStream = integerStream.pipeTo(writableStream);
+// 0
+// 1
+// 2
+// 3
+// 4
+````
+这里的管道连接操作隐式从`ReadableStream`获得了一个读取器,并把产生的值填充到`WritableStream`.
+
+## 计时API
+`Performance`接口通过JS API暴露了浏览器内部的度量指标(性能).这个接口暴露在`window.performance`对象上.所有与页面相关的指标,包括已经定义和将来会定义的,都会存在于这个对象上.
+
+`Performance`接口由多个API构成:
+- `High Resolution Time API`
+- `Performance Timeline API`
+- `Navigation Timing API`
+- `User Timing API`
+- `Resource Timing API`
+- `Paint Timing API`
+
+### High Resolution Time API
+对于`Date`的时间,其精度并不高,而且受系统时间调整的影响.
+
+`High Resolution Time API`定义了`window.performance.now()`,该方法返回一个微秒精度的浮点数.而且这个方法可以保证时间戳单调增长.
+````JS
+const t0 = performance.now();
+const t1 = performance.now();
+console.log(t0);    // 1768.625000026077
+console.log(t1);    // 1768.6300000059418
+const duration = t1 - t0;
+console.log(duration);  // 0.004999979864805937
+````
+
+该计数器使用相对度量.会在上下文创建时从0开始计时.例如,打开页面或创建工作线程时,`performance.now()`就会从0开始计时.不同上下文之间会存在初始时间差,不能直接比较,但可以使用`performance.timeOrigin`属性返回计时器初始化时全局系统时钟的值.
+````JS
+const relativeTimestamp = performance.now();
+const absoluteTimestamp = performance.timeOrigin + relativeTimestamp;
+console.log(relativeTimestamp); // 294.40000000596046
+console.log(absoluteTimestamp); // 1732254247472.5
+````
+
+*注:通过使用`performance.now()`测量L1缓存与主内存的延迟差,幽灵漏洞(Spectre)可以执行缓存推断攻击.因此主浏览器会选择降到其精度或在时间戳内混入一些随机性.详见[WebKit-What Spectre and Meltdown Mean For WebKit](https://webkit.org/blog/8048/what-spectre-and-meltdown-mean-for-webkit/)*
+
+### Performance Timeline API
+`Performance Timeline API`使用一套用于度量客户端延迟的工具.性能度量将会采用计算结束和开始时间差的形式.这些开始和结束时间会被记录为`DOMHighResTimeStamp`值,而封装这个时间戳的对象时`PerformanceEntry`的实例.
+
+浏览器会自动记录各种`PerformanceEntry`对象,而使用`Performance.mark()`也可以记录自定义`PerformanceEntry`对象.在一个执行上下文中被记录的所有性能条目可以通过`performance.getEntries()`获取:
+````JS
+setTimeout(() => { console.log(performance.getEntries()); }, 1000);
+// [PerformanceNavigationTiming, VisibilityStateEntry, PerformancePaintTiming, PerformancePaintTiming]
+// 注意:上面的输出列表会随着时间推移而变长
+````
+
+这个返回的集合代表浏览器的性能时间线.每个`PerformanceEntry`对象都有`name`,`entryType`,`startTime`和`duration`属性:
+````JS
+const entry = performance.getEntries()[0];
+console.log(entry.name);        // "https://www.example.com"
+console.log(entry.entryType);   // navigation
+console.log(entry.startTime);   // 0
+console.log(entry.duration);    // 182.365000015122468
+````
+
+`performance.getEntriesByName(name)`根据`name`属性来返回`PerformanceEntry`对象的集合.  
+`performance.getEntriesByType(type)`根据`entryType`属性来返回`PerformanceEntry`对象的集合.
+
+`PerformanceEntry`是一个抽象基类.所有记录条目都继承`PerformanceEntry`,包含以下具体类:
+- `PerformanceMark`
+- `PerformanceMeasure`
+- `PerformanceFrameTiming`
+- `PerformanceNavigationTiming`
+- `PerformanceResourceTiming`
+- `PerformancePaintTiming`
+
+上面的每个类都会增加大量属性,用于描述与相应条目有关的元数据.每个实例的`name`和`entryType`属性会因为各自的类不同而不同.
+
+#### User Timing API
+`User Timing API`用于记录和分析自定义性能条目.记录自定义性能条目要使用`performance.mark()`方法:
+````JS
+performance.mark('foo');
+console.log(performance.getEntriesByType('mark')[0]);
+// PerformanceMark {
+//     "name": "foo",
+//     "entryType": "mark",
+//     "startTime": 24,
+//     "duration": 0
+// }
+for (let i = 0; i < 1E6; ++i) {}
+performance.mark('bar');
+const [endMark, startMark] = performance.getEntriesByType('mark');
+console.log(startMark.startTime - endMark.startTime);   // 2.300000011920929
+````
+
+还可以生成`PerformanceMeasure`条目,对应由名字作为标识的两个标记之间的持续时间.`PerformanceMeasure`的实例由`performance.measure()`方法生成:
+````JS
+performance.mark('foo');
+for (let i = 0; i < 1E6; ++i) {}
+performance.mark('bar');
+performance.measure('baz', 'foo', 'bar');
+const [differenceMark] = performance.getEntriesByType('measure');
+console.log(differenceMark);
+// PerformanceMeasure {
+//     "name": "baz",
+//     "entryType": "measure",
+//     "startTime": 49.599999994039536,
+//     "duration": 3.0999999940395355
+// }
+````
+
+#### Navigation Timing API
+`Navigation Timing API`提供了高精度时间戳,用于度量当前页面加载速度.浏览器会在导航事件发生时自动记录`PerformanceNavigationTiming`条目.这个对象会捕获大量事件戳,用于描述页面是何时以及如何加载的.
+
+详见[MDN-PerformanceNavigationTiming](https://developer.mozilla.org/zh-CN/docs/Web/API/PerformanceNavigationTiming)
+
+#### Resource Timing API
+`Resource Timing API`提供了高精度事件戳,用于度量当前页面加载时请求资源的速度.浏览器会在加载资源时自动记录`PerformanceResourceTiming`.这个对象会捕获大量时间戳,用于描述资源加载速度.
+
+详见[MDN-PerformanceResourceTiming](https://developer.mozilla.org/zh-CN/docs/Web/API/PerformanceResourceTiming)
+
+## Web组件
+这里所说的Web组件指的是一套用于增强DOM行为的工具,包括影子DOM,自定义元素和HTML模板.
+
+*注意:这部分API可能没有统一的规范*
+
+### HTML模板
+HTML模板的核心思想是提前在页面中写好,让浏览器自动将其解析为DOM子树,但不进行渲染.这可以避免使用`innerHTML`的安全隐患和`document.createElement()`的性能损失和麻烦.
+
+HTML元素`<template>`用于创建一个HTML模板:
+````JS
+<template id="foo">
+    <p>A template</p>
+</template>
+````
+
+#### 使用DocumentFragment
+浏览器在渲染时,`<template>`的内容不会被显示,也不属于活动文档,所以`document.querySelector()`等DOM查询方法不会发现其中的`<p>`标签(但仍然能发现外围的`<template>`).`<p>`存在于一个包含在HTML模板中的`DocumentFragment`节点内:
+````HTML
+<!-- 开发者工具 -->
+<template id="foo">
+  #document-fragment
+    <p>A template</p>
+</template>
+````
+通过`<template>`元素的`content`属性可以取得这个`DocumentFragment`的引用:
+````JS
+console.log(document.querySelector('#foo').content);    // #document-fragment
+````
+
+对于该`DocumentFragment`,使用其DOM方法可以发现`<p>`标签.利用该`DocumentFragment`,可以一次性添加所有子节点,且比连续调用`document.appendChild()`更加高效,前者最多只需要一次布局重排.
+
+允许使用该`DocumentFragment`对`<template>`的内容进行修改,且不会影响网页渲染.
+
+将`DocumentFragment`作为子节点插入实际上是将`DocumentFragment`的子节点转移为另一个节点的子节点:
+````JS
+const fragment = new DocumentFragment();
+fragment.appendChild(document.createElement('p'));
+fragment.appendChild(document.createElement('p'));
+fragment.appendChild(document.createElement('p'));
+console.log(fragment.children.length);  // 3
+document.body.appendChild(fragment);
+console.log(fragment.children.length);  // 0
+````
+
+#### 使用`<template>`标签
+同样,可以用上面的方法把`<template>`的内容移动:
+````HTML
+<body>
+    <template id="foo">
+        <ul>
+            <li>abc</li>
+            <li>abc</li>
+            <li>abc</li>
+        </ul>
+    </template>
+</body>
+````
+````JS
+const foo = document.getElementById('foo').content;
+document.body.appendChild(foo);
+````
+执行后`<template>`的内容变为空,此时的HTML为:
+````HTML
+<body>
+    <template id="foo"></template>
+    <ul>
+        <li>abc</li>
+        <li>abc</li>
+        <li>abc</li>
+    </ul>
+</body>
+````
+
+如果想要复制模板,可以使用`importNode()`方法克隆`DocumentFragment`(或者`cloneNode()`方法?):
+````JS
+const foo = document.getElementById('foo').content;
+document.body.appendChild(document.importNode(foo, true));
+````
+
+#### 模板脚本
+脚本执行可以推迟到将`DocumentFragment`的内容实际添加到DOM树:
+````HTML
+<body>
+    <template id="foo">
+        <script>console.log('Template script executed');</script>
+    </template>
+    <script src="script.js"></script>
+</body>
+````
+````JS
+const foo = document.getElementById('foo').content;
+console.log('About to add template');
+document.body.appendChild(foo);
+console.log('Added template');
+// About to add template
+// Template script executed
+// Added template
+````
+执行后的HTML:
+````HTML
+<body>
+    <template id="foo"></template>
+    <script src="try.js"></script>
+    <script>console.log('Template script executed');</script>
+</body>
+````
+
+注意:即使`<script>`插入到了暂时未执行到的地方,其也会立即执行.
+
+### 影子DOM
+使用影子DOM可以将完整的DOM树作为节点添加到DOM树.这样可以实现DOM的封装.即使是CSS样式也可以限制在影子DOM子树而不是整个顶级DOM树中.
+
+DOM与HTML模板很类似,但是影子DOM的内容会实际渲染到页面上.
+
+#### 理解影子DOM
+例如,对于:
+````HTML
+<div class="red-text">
+    <p>Make me red!</p>
+</div>
+<div class="green-text">
+    <p>Make me green!</p>
+</div>
+<div class="blue-text">
+    <p>Make me blue!</p>
+</div>
+
+<style>
+    .red-text {
+        color: red;
+    }
+    .green-text {
+        color: green;
+    }
+    .blue-text {
+        color: blue;
+    }
+</style>
+````
+我希望这些CSS样式仅仅应用于这3个`<div>`,而不渗透到其他地方.解决方法就是使CSS选择符足够特别,或者使用影子DOM.
+
+#### 创建影子DOM
+考虑到安全以及避免影子DOM冲突,并非所有元素都可以包含影子DOM.尝试给无效元素或者已经有了影子DOM的元素添加影子DOM会导致抛出错误.
+
+可以容纳影子DOM的元素包括:
+- 任何带有有效的名称且可独立存在的(autonomous)自定义元素
+- `<article>`
+- `<aside>`
+- `<blockquote>`
+- `<body>`
+- `<div>`
+- `<footer>`
+- `<h1>`
+- `<h2>`
+- `<h3>`
+- `<h4>`
+- `<h5>`
+- `<h6>`
+- `<header>`
+- `<main>`
+- `<nav>`
+- `<p>`
+- `<section>`
+- `<span>`
+
+影子DOM使通过元素的`attachShadow()`方法创建并添加给有效HTML元素的.容纳影子DOM的元素被称为*影子宿主*.影子DOM的根节点被称为*影子根*.
+
+`attachShadow()`方法需要一个`shadowRootInit`对象,返回影子DOM的实例.`shadowRootInit`对象必须包含一个`mode`属性,值为`"open"`或`"closed"`.对`open`影子DOM的引用可以通过`shadowRoot`属性在HTML元素上获得,而对`closed`影子DOM的引用无法这样获得.
+
+````JS
+const foo = document.getElementById('foo');
+const bar = document.getElementById('bar');
+const openShadowDOM = foo.attachShadow({ mode: 'open' });
+const closeShadowDOM = bar.attachShadow({ mode: 'closed' });
+console.log(openShadowDOM);     // #shadow-root (open)
+console.log(closeShadowDOM);    // #shadow-root (closed)
+console.log(foo.shadowRoot);    // #shadow-root (open)
+console.log(bar.shadowRoot);    // null
+````
+
+注意:恶意代码可以绕过`closed`影子DOM的限制,从而恢复对影子DOM的访问.因此不能为了安全创建保密(closed)影子DOM,需要创建保密影子DOM的场景也很少.如果想保护独立的DOM树不受未信任代码影响,对`<iframe>`施加的跨源限制更可靠.
+
+#### 使用影子DOM
+把影子DOM添加到元素之后,可以像使用常规DOM一样使用影子DOM:
+````JS
+const foo = document.getElementById('foo');
+const shadowDOM = foo.attachShadow({ mode: 'open' });
+shadowDOM.innerHTML = `<p style="red-text" id="in-shadow">Hello world</p>`
+console.log(document.getElementById("in-shadow"));
+console.log(shadowDOM.getElementById("in-shadow"));
+````
+对应的HTML(修改后):
+````HTML
+<div id="foo">
+  #shadow-root (open)
+    <p style="red-text" id="in-shadow">Hello world</p>
+</div>
+<div id="bar"></div>
+````
+
+HTML元素可以在影子DOM内外之间无限制移动,即使它们属于不同的DOM树.
+
+#### 合成与影子DOM槽位
+对于影子DOM,其一旦添加到元素中,浏览器就会赋予其最高的渲染优先级(因为影子DOM不属于原有的DOM树,却又需要渲染).例如:
+````JS
+document.body.innerHTML = `
+<div>
+    <p>Foo</p>
+</div>
+`;
+setTimeout(() => document.querySelector('div').attachShadow({ mode: 'open' }), 1000);
+````
+上述代码中,空的影子DOM渲染优先级会高于`<p>`,因此`<div>`内的文本会在1000毫秒后被隐藏.
+
+为了显示文本内容,需要使用`<slot>`标签指示浏览器在哪里放置原来的HTML:
+````JS
+document.body.innerHTML = `
+<div>
+    <p>Foo</p>
+</div>
+`;
+document.querySelector('div').attachShadow({ mode: 'open' })
+        .innerHTML = `<div id="bar">
+                        <slot></slot>
+                     </div>`
+````
+最终的HTML为:
+````HTML
+<div>
+  #shadow-root (open)
+    <div id="bar">
+        <slot>
+            #reveal <!-- 浏览器会在这里显示一个灰色的<p> -->
+        </slot>
+    </div>
+    <p>Foo</p> #slot    <!--这里的#slot 和 #reveal其实都是按钮,分别表示导航到对应的<slot>和真实存在的位置-->
+</div>
+````
+
+除了默认槽位,还可以使用*命名槽位*实现多个投射.这是通过匹配的`slot`/`name`属性对实现的.带有`slot="foo"`属性的元素会被投射到带有`name="foo"`的`<slot>`上:
+````JS
+document.body.innerHTML = `
+<div>
+    <p slot="foo">Foo</p>
+    <p slot="bar">Bar</p>
+</div>
+`;
+
+document.querySelector('div')
+    .attachShadow({ mode: 'open' })
+    .innerHTML = `
+    <slot name="bar"></slot>
+    <slot name="foo"></slot>
+    `
+````
+
+#### 事件重定向
+如果影子DOM中发生了浏览器事件(如`click`),那么浏览器需要一种方式让父DOM处理事件.不过,实现也必须考虑影子DOM的边界.为此,事件会逃出(冒泡)影子DOM并经过*事件重定义向*在外部能被处理.逃出后,事件就好像是由影子宿主本身而非真正的包装元素触发的一样.
+
+````JS
+document.body.innerHTML = `
+<div onclick="console.log('Handled outside:', event.target)"></div>
+`;
+document.querySelector('div')
+    .attachShadow({ mode: 'open' })
+    .innerHTML = `
+<button onclick="console.log('Handled inside:', event.target)">Foo</button>
+`;
+// 点击按钮时:
+// Handled inside: <button onclick="..."></button>
+// Handled outside: <div onclick="..."></div>
+````
+事件重定向只会发生在影子DOM中实际存在的元素上.使用`<slot>`标签从外部投射进来的元素不会发生事件重定向,因为这些元素仍然存在于影子DOM外部.
+
+### 自定义元素
+自定义元素为HTML元素引入了面向对象编程风格.
+
+#### 创建自定义元素
+浏览器会尝试将无法识别的元素作为通用元素整合进DOM.当然,这些元素默认会做任何通用HTML元素做的事,即显示其中的文本:
+````HTML
+<x-foo>I'm inside a nonsense element.</x-foo>
+````
+````JS
+let foo = document.getElementsByTagName('x-foo')[0];
+console.log(foo instanceof HTMLElement);    // true
+````
+自定义元素默认会被标识为`HTMLElement`.
+
+为了实现更加复杂的行为,自定义元素要使用全局属性`customElements`,这个属性会返回`CustomElementRegistry`对象.
+
+调用`customElements.define()`方法可以创建自定义元素:
+````JS
+class FooElement extends HTMLElement {  // 很少有创建自定义元素而不继承HTMLElement的.
+    constructor() {
+        super();    // 自定义元素的构造函数中必须始终先调用super().如果没有定义构造函数,会默认调用super().
+        console.log('x-foo');
+    }
+}
+customElements.define('x-foo', FooElement);
+// x-foo
+console.log(document.querySelector('x-foo') instanceof FooElement); // true
+console.log(customElements);    // CustomElementRegistry { ... }
+````
+
+注意:自定义元素名必须至少包含一个不在名称开头和末尾的连字符,而且元素标签不能自关闭.
+
+如果自定义元素继承了一个元素类,那么可以使用`is`属性和`extends`选项将标签指定为该自定义元素的实例:
+````HTML
+<div is="x-foo"></div>
+````
+````JS
+class FooElement extends HTMLDivElement {
+    constructor() {
+        super();
+        console.log('x-foo');
+    }
+}
+customElements.define('x-foo', FooElement, { extends: 'div' });
+// x-foo
+````
+
+自定义元素可以添加子DOM内容,也可以为自定义元素添加影子DOM并将内容添加到这个影子DOM中.
+
+#### 使用自定义元素生命周期方法
+可以在自定义元素的不同生命周期执行代码.带有相应名称的自定义元素类的实例方法会在不同生命周期阶段被调用.自定义元素有以下5个生命周期方法:
+- `constructor()`:在创建元素实例或将已有DOM元素升级为自定义元素时调用.
+- `connectedCallback()`:每当元素添加到文档中时调用.规范建议开发人员尽可能在此回调中实现自定义元素的设定,而不是在构造函数中实现.
+- `disconnectedCallback()`:每当元素从文档中移除时调用.
+- `adoptedCallback()`:每当元素通过`document.adoptNode()`而被移动到新文档中时调用.
+- `attributeChangedCallback()`:在每次可观察属性更改,添加,移除或替换时调用.在元素实例初始化时,初始值的定义也算一次变化.
+
+````JS
+class FooElement extends HTMLElement {
+    constructor() {
+        super();
+        console.log('ctor');
+        // 设置属性不要在构造函数中,因为使用document.createElement()创建的元素不能拥有属性
+    }
+    get bar() {
+        return this.getAttribute('bar');
+    }
+    set bar(value) {
+        this.setAttribute('bar', value);
+    }
+    connectedCallback() {
+        console.log('connected');
+        this.bar = true;    // 这个会映射到DOM属性上,因为定义了相应的set和get函数
+        this.baz = true;    // 这个不会映射到DOM属性上
+    }
+    disconnectedCallback() {
+        console.log('disconnect');
+    }
+}
+customElements.define('x-foo', FooElement);
+const fooElement = document.createElement('x-foo');
+// ctor
+document.body.appendChild(fooElement);
+// connected
+console.log(fooElement);    // <x-foo bar="true"></x-foo>
+setTimeout(() => {
+    document.body.removeChild(fooElement);
+    // disconnected
+}, 100);
+````
+
+对于`attributeChangedCallback()`,需要一个静态属性`observedAttributes`来表示哪些属性在被修改之后需要回调:
+````JS
+class FooElement extends HTMLElement {
+    static observedAttributes = ["bar"];    // 指示应该触发attributeChangedCallback()的属性名的数组
+    get bar() {
+        return this.getAttribute('bar');
+    }
+    set bar(value) {
+        this.setAttribute('bar', value);
+    }
+    connectedCallback() {
+        this.bar = true;
+    }
+    attributeChangedCallback(name, oldValue, newValue) {
+        console.log(`${name}: ${oldValue} -> ${newValue}`);
+    }
+}
+customElements.define('x-foo', FooElement);
+const fooElement = document.createElement('x-foo');
+document.body.appendChild(fooElement);
+// bar: null -> true
+fooElement.bar = false;
+// bar: true -> false
+````
+
+#### 升级自定义元素
+`CustomElementRegistry`上额外暴露了一些方法,这些方法可以检测自定义元素是否定义完成,然后可以用它来升级已有元素.
+
+`CustomElementRegistry.get()`方法会返回相应自定义元素的类.
+
+`CustomElementRegistry.whenDefined()`方法会返回一个期约,当相应自定义元素有定义之后解决.
+
+连接到DOM的元素在自定义元素有定义时会*自动升级*.如果想在元素连接到DOM之前强制升级,可以使用`CustomElementRegistry.upgrade()`方法.
+
+````JS
+class FooElement extends HTMLElement {}
+let foo = document.querySelector('x-foo');
+customElements.whenDefined('x-foo').then((value) => console.log('defined:',value));
+console.log(customElements.get('x-foo'));   // undefined
+customElements.upgrade(foo); // 强制升级
+customElements.define('x-foo', FooElement);
+console.log(customElements.get('x-foo'));   // class FooElement extends HTMLElement {}
+// defined: class FooElement extends HTMLElement {}
+````
+
+## Web Cryptography API
+### 生成随机数
+`Math.random()`方法是伪随机数生成器(PRNG)实现的,攻击者只要知道PRNG的内部状态,就可以预测后续生成的伪随机值.
+
+PRNG不适和用于加密计算.为解决这个问题,`Web Cryptography API`引入了密码学安全伪随机数生成器(CSPRNG),这个CSPRNG可以通过`crypto.getRandomValues()`在全局`Crypto`对象上访问.`getRandomValues()`会把随机值写入作为参数传给它的定型数组.定型数组的类不重要,因为底层缓冲区会被随机的二进制位填充:
+````JS
+const array = new Uint8Array(2);
+for (let i = 0; i < 5; ++i) {
+    console.log(crypto.getRandomValues(array));
+}
+// Uint8Array [11, 222]
+// Uint8Array [242, 213]
+// Uint8Array [30, 212]
+// Uint8Array [232, 88]
+// Uint8Array [115, 64]
+````
+
+`getRandomValues()`最多可以生成`2^16`字节,超出则会抛出错误.
+
+### 使用SubtleCrypto对象
+`SubtleCrypto`对象可以通过`window.crypto.subtle`访问.
+
+这个对象包含一组方法,用于执行常见的密码学功能,如加密,散列,签名和生成密钥.因为所有密码学操作都在原始二进制数据上执行,所以`SubtleCrypto`的每个方法都要用到`ArrayBuffer`和`ArrayBufferView`类型.由于字符串是密码学操作的重要应用场景,因此`TextEncoder`和`TextDecoder`是经常与`SubtleCrypto`一起使用的类,用于实现二进制数据与字符串之间的相互转换.
+
+*`SubtleCrypto`对象只能在安全上下文(https)中使用.否则`subtle`属性为`undefined`.*
+
+#### 生成密码学摘要
+计算数据的密码学摘要是非常常用的密码学操作.这个规范支持4种摘要算法:`SHA-1`和3种`SHA-2`.
+- `SHA-1`(Secure Hash Algorithm 1):架构类似MD5的散列函数.接收任意大小的输入,生成160位消息散列.由于容易受到碰撞攻击,这个算法已经不再安全.
+- `SHA-2`(Secure Hash Algorithm 2):构建于相同耐碰撞单向压缩函数之上的一套散列函数.规范支持其中3种:`SHA-256`,`SHA-384`,`SHA-512`.生成的消息摘要可以是256位(SHA-256),384位(SHA-384)或512位(SHA-512).这个算法被认为是安全的,广泛应用于很多领域和协议,包括TLS,PGP和加密货币(如比特币).
+
+`SubtleCrypto.digest()`方法用于生成信息摘要.要使用的散列算法通过字符串`"SHA-1"`,`"SHA-256"`,`"SHA-384"`,`"SHA-512"`指定.返回一个`Promise`,解决一个包含摘要值的`ArrayBuffer`.
+````JS
+const message = new TextEncoder().encode('foo');    // 转换为二进制
+const messageDigest = crypto.subtle.digest('SHA-256', message);
+messageDigest.then((value) => {
+    console.log(value); // ArrayBuffer(32)
+    const arr = new Uint32Array(value);
+    console.log(arr);   // Uint32Array(8) [1806968364, 2412183400, 1011194873, 876687389, 1882014227, 2696905572, 2287897337, 2934400610]
+    return Promise.resolve(new Uint8Array(value));
+}).then((value) => console.log(
+    Array.from(value)   // 这里的value需要以8位进行分隔,否则会出现大小端的问题
+         .map((x) => x.toString(16).padStart(2, '0'))
+         .join("")
+));
+````
+
+#### CryptoKey与算法
+`SubtleCrypto`对象使用`CryptoKey`类的实例来生成密钥.`CryptoKey`类支持多种加密算法,允许终止密钥的抽取和使用.
+
+`CryptoKey`类支持以下算法,按各自的父密码系统归类:
+- `RSA`:公钥密码系统,使用两个大素数获得一对公钥和私钥,可用于签名/验证或加密/解密消息.`RSA`的陷门函数被称为`分解难题`.
+- `RSASSA-PKCS1-v1_5`:RSA的一个应用,用于使用私钥给消息签名,允许使用公钥验证签名.
+  - `SSA`:表示算法支持签名生成和验证操作.
+  - `PKCS1`表示算法展示出的RSA密钥必需的数学特征.
+  - `RSASSA-PKCS1-v1_5`:是确定性的,意味着同样的消息和密钥每次都会生成相同的签名.
+- `RSA-PSS`:RSA的另一个应用,用于签名和验证消息.
+  - `PSS`表示生成签名时会加盐以得到随机签名.
+  - 与`RSASSA-PKCS1-v1_5`不同,同样的消息和密钥每次都会生成不同的签名.
+  - 与`RSASSA-PKCS1-v1_5`不同,`RSA-PSS`有可能简约到`RSA`分解难题的难度.
+  - 通常,虽然`RSASSA-PKCS1-v1_5`仍被认为是安全的,但`RSA-PSS`应该用于代替`RSASSA-PKCS1-v1_5`.
+- `RSA-OAEP`:RSA的一个应用,用于使用公钥加密信息,用私钥来解密.
+  - `OAEP`表示算法利用了`Feistel`网络在加密前处理未加密的消息.
+  - `OAEP`只要将确定性RSA加密模式转换为概率性加密模式.
+- `ECC`:公钥密码系统,使用一个素数和一个椭圆曲线获得一对公钥和私钥,可用于签名/验证消息.ECC的陷门系统被称为`椭圆曲线离散对数问题`.ECC被认为优于RSA.虽然RSA和ECC在密码学意义上都很强,但ECC密钥比RSA密钥短,而且ECC密码学操作比RSA操作快.
+- `ECDSA`:ECC的一个应用,用于签名和验证消息.这个算法是`数字签名算法(DSA)`的一个椭圆曲线风格的变体.
+- `ECDH`:ECC的密钥生成和密钥协议应用,允许两方通过公开通信渠道建立共享的机密.这个算法是`Diffie-Hellman密钥交换`协议的一个椭圆曲线风格的变体.
+- `AES`:对称密钥密码系统,使用派生自置换组合网络的分组密码加密和解密数据.AES在不同模式下使用,不同模式算法的特性也不同.
+- `AES-CTR`:AES的`计数器模式`.这个模式使用递增计数器生成器密钥流,其行为类似密文流.使用时必需为其提供一个随机数,用作初始化向量.`AES-CTR`加密/解密可以并行.
+- `AES-CBC`:AES的`密码分组链模式`.在加密纯文本的每个分组之前,先使用之前密文分组求`XOR`,也就是名字中的"链".使用一个初始化向量作为第一个分组的XOR输入.
+- `AES-GCM`:AES的`伽罗瓦/计数器模式`.这个模式使用计数器和初始化向量生成一个值,这个值会与每个分组的纯文本计算XOR.与CBC不同,这个模式的XOR输入不依赖之前分组密文.因此GCM模式可以并行.由于其卓越的性能,ASM-GCM在很多网络安全协议中得到了应用.
+- `AES-KW`:AES的`密钥包装模式`.这个算法将加密密钥包装为一个可移植且加密的格式,可以在不信任的渠道中传输.传输之后,接收方可以解包密钥.与其他AES模式不同,`AES-KW`不需要初始化向量.
+- `HMAC`:用于生成`消息认证码`的算法,用于验证通过不可信网络接收的消息没有被修改过.两方使用散列函数和共享密钥来签名和验证消息.
+- `KDF`:可以使用散列函数从主密钥获得一个或多个密钥的算法.`KDF`能够生成不同长度的密钥,也能把密钥转换为不同格式.
+- `HKDF`:密钥推导函数,与高熵输入(如已有密钥)一起使用.
+- `PBKDF2`:密钥推导函数,与低熵输入(如密钥字符串)一起使用.
+
+详见[W3C-Web Cryptography API-Algorithm Overview](https://w3c.github.io/webcrypto/#algorithms)
+
+#### 生成CryptoKey
+使用`SubtleCrypto.generateKey()`方法可以生成随机`CryptoKey`,这个方法可以返回一个期约,解决为一个或多个`CryptoKey`实例.使用时需要给这个方法传入一个指定目标算法的参数对象,一个表示密钥是否可以从`CryptoKey`对象中提取出来的布尔值,以及一个表示这个密钥可以与哪个`SubtleCrypto`方法一起使用的字符串数组.
+
+由于不同的密码系统需要不同的输入来生成密钥,上述参数对象为每种密码系统都规定了必需的输入.
+
+/// TODO
+
+# 错误处理与调试
+## 浏览器错误报告
+### 桌面控制台
+所有现代的桌面浏览器都会通过控制台暴露错误.这些错误可以显示在开发者工具的内嵌控制台中.
+
+### 移动控制台
+移动浏览器不会直接在设别上提供控制台界面.不过,还是有一些途径可以在移动设备中检查错误.
+
+详见:
+- [Google Developers-Remote debug Android devices](https://developer.chrome.google.cn/docs/devtools/remote-debugging)
+- [Apple Developer-Web Inspector](https://developer.apple.com/documentation/safari-developer-tools/web-inspector/)
+
+## 错误处理
+### try/catch语句
+`try/catch`语句的基本语法如下:
+````JS
+try {
+    // 可能出错的代码
+} catch (error) {
+    // 出错时要做什么
+}
+````
+
+如果`try`块中有代码发生错误,代码会立即退出执行,并跳到`catch`块中.`catch`块此时接收到一个对象,该对象包含发生错误的相关信息.即使在`catch`块中不使用错误对象,也必须为它定义名称.错误对象中暴露的实际信息因浏览器而异,但至少包含保存错误消息的`message`属性.规范也指定了定义错误类型的`name`属性:
+````JS
+try {
+    undefined();
+} catch (error) {
+    console.log(error.message); // undefined is not a function
+    console.log(error.name);    // TypeError
+}
+````
+
+#### finally子句
+`try/catch`语句中可选的`finally`子句始终运行.如果`try`块中的代码运行完,则接着执行`finally`块中的代码.如果出错并执行`catch`块中的代码,则`finally`块中的代码仍执行.`try`或`catch`块无法阻止`finally`块执行,`return`语句也无法阻止:
+````JS
+function testFinally() {
+    try {
+        return 2;
+    } catch (error) {
+        return 1;
+    } finally {
+        return 0;
+    }
+}
+````
+
+这个函数由于`finally`块的存在导致`try`块中的`return`语句被忽略.因此,这个函数永远返回`0`.如果去掉`finally`子句,该函数会返回`2`.如果写出`finally`子句,`catch`块就成了可选的(它们两者中只有一个是必需的).
+
+#### 错误类型
+代码执行过程中会发生各种类型的错误.每种类型都会对应一个错误发生时抛出的错误对象:
+- `Error`
+- `InternalError`
+- `EvalError`
+- `RangeError`
+- `ReferenceError`
+- `SyntaxError`
+- `TypeError`
+- `URIError`
+
+`Error`是基类型,其他错误类型继承该类型.因此,所有错误类型都共享相同的属性(所有错误对象上的方法都是这个默认类型定义的方法).浏览器很少会抛出`Error`类型错误,该类型错误主要用于开发者抛出自定义错误.
+
+`InternalError`类型的错误会在底层JS引擎抛出异常时由浏览器抛出.例如,递归过多导致了栈溢出.这个类型并不是代码中通常要处理的错误,如果真发生了这种错误,很可能代码哪里弄错了或者有危险了.
+
+`EvalError`类型的错误会在使用`eval()`函数发生异常时抛出.其发生在不将`eval()`作为函数直接调用或`eval`被赋值时.
+
+`RangeErrir`错误会在数组越界时抛出.
+
+`ReferenceError`会在找不到对象时发生.这种错误经常是由访问不存在的变量而导致的.
+
+`SyntaxError`经常在给`eval()`传入的字符串包含JS语法错误时发生.
+
+`TypeError`在JS中很常见,主要发生在变量不是预期类型,或者访问不存在的方法时.很多原因可能导致这种错误,尤其是在使用类型特定的操作而变量类型不对时.
+
+`URIError`只会在使用`encodeURI()`或`decodeURI()`但传入了格式错误的URI时发生.
+
+在`try/catch`语句的`catch`块中,可以使用`instanceof`操作符确定错误类型:
+````JS
+try {
+    someFunc();
+} catch (error) {
+    if (error instanceof TypeError) {
+        // ...
+    } else if (error instanceof ReferenceError) {
+        // ...
+    } else {
+        // ...
+    }
+}
+````
+
+### 抛出错误
+与`try/catch`语句对应的一个机制是`throw`操作符,用于在任何时候抛出自定义错误.`throw`操作符必须有一个值,但值的类型不限:
+````JS
+throw 12345;
+throw "Hello world!";
+throw true;
+throw { name: "JavaScript" };
+````
+
+使用`throw`操作符时,代码立即停止执行,除非`try/catch`语句捕获了抛出的值.
+
+可以通过内置的错误类型来模拟浏览器错误.每种错误类型的构造函数都只接收一个参数,就是错误消息:
+````JS
+throw new Error("something happened");
+throw new SyntaxError("syntax error");
+````
+
+也可以通过继承`Error`创建自定义的错误类型.创建自定义错误类型时,需要提供`name`和`message`属性:
+````JS
+class CustomError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = "CustomError";
+        this.message = message;
+    }
+}
+throw new CustomError("My message");
+````
+
+使用适当的信息创建自定义错误可以有效提高代码的可维护性:
+````JS
+function process(values) {
+    if (!(value instanceof Array)) {
+        throw new Error("process(): Argument must be an array.");
+    }
+    values.sort();
+    for (let value of values) {
+        if (value > 100) {
+            return value;
+        }
+    }
+    return -1;
+}
+````
+
+一般来说,错误要在应用程序架构的底层抛出,在这个层面上,人们对正在进行的流程知之甚少,因此无法真正地处理错误.因此,应该认真烤炉抛出带有详细信息的错误.然后捕获和处理错误交给应用程序就行了.
+
+### error事件
+**这种事件处理的相关文章已经无法在MDN上找到,取而代之的是符合DOM2规范的`ErrorEvent`.**
+
+任何没有被`try/catch`语句处理的错误都会在`window`对象上触发`error`事件.该事件是浏览器早期支持的事件,为了向后兼容,很多浏览器保持了其格式不变.在`error`事件处理程序中,浏览器会传入3个参数:错误信息,发生错误的URL和行号.这种事件处理程序需要使用`DOM Level0`技术来指定,因为它不遵勖`DOM Level2 Events`规范:
+````JS
+window.onerror = (message, url, line) => {
+    console.log(message);   // Script error.
+    return false;   // 返回false表示阻止浏览器默认报告错误的行为
+};
+throw new Error("");
+````
+
+上面这个方法已经不符合规范,建议使用[MDN-ErrorEvent](https://developer.mozilla.org/zh-CN/docs/Web/API/ErrorEvent)
+
+图片也支持`error`事件.任何时候,如果图片`src`属性的URL没有返回可识别的图片格式,就会触发`error`事件.这个事件遵循DOM格式,返回一个以图片为目标的`event`对象:
+````JS
+const image = new Image();
+image.addEventListener("load", (event) => {
+    console.log("Image loaded!");
+});
+image.addEventListener("error", (event) => {
+    console.log("Image not loaded!");
+});
+image.src = "notExist.gif";
+````
+
+### 识别错误
+错误处理非常重要的部分是首先识别错误可能会在代码中的什么地方发生,因为JS是松散类型的,不会验证函数参数,所以很多错误只有在代码真正运行起来时才会出现.通常,需要注意3类错误:
+- 类型转换错误
+- 数据类型错误
+- 通信错误
+
+#### 静态代码分析器
+通过在代码构建流程中添加静态代码分析或代码检查器(linter),可以预先发现非常多的错误.这样的代码分析工具有很多,常用的静态分析工具时`JSHint`,`JSLint`,`Google Closure`,`TypeScript`.
+
+静态代码分析器要求使用类型,函数签名及其他指令来注解JS,以此描述程序如何在基本可执行代码之外运行.分析器会比较注解和JS代码的各个部分,对在实际运行时可能出现的潜在不兼容问题给出提醒.
+
+#### 类型转换错误
+类型转换错误的主要原因时使用了会自动改变某个值的数据类型的操作符或语言构建.使用`==`或`!=`操作符,以及在`if`,`for`,`while`等流程控制语句中使用非布尔值,经常会导致类型转换错误.
+
+#### 数据类型错误
+因为JS是松散类型的,所以变量和函数参数都不能保证会使用正确的数据类型.开发者需要自己检查数据类型,确保不会发生错误.数据类型错误常发生在将意外值传给函数的时候.
+
+例如:
+````JS
+function getQueryString(url) {
+    if (typeof url === "string") {  // 通过类型检查保证安全
+        let pos = url.indexOf("?");
+        if (pos > -1) {
+            return url.substring(pos + 1);
+        }
+    }
+    return "";
+}
+
+function reverseSort(values) {
+    if (values instanceof Array) {
+        values.sort();
+        values.reverse();
+    }
+}
+````
+
+#### 通信错误
+随着Ajax编程的出现,Web应用程序在运行期间动态数据和功能成为常见的情形.JS和服务器之间的通信也会出现错误.
+
+第一种错误是URL格式或发送数据的格式不正确.通常,把数据发送到服务器之前没有用`encodeURIComponent()`编码,会导致这种错误.例如,下面的URL格式就不正确:`http://www.yourdomain.com/?redir=http://someotherdomain.com?a=b&c=d`.使用`encodeURIComponent()`修复后,得到的结果如下:`http://www.yourdomain.com/?redir=http%3A%2F%2Fwww.someotherdomain.com%3Fa%3Db%26c%3Dd`
+
+在服务器相应非预期值时也会发生通信错误.在动态加载脚本或样式时,请求的资源有可能不可用.有些浏览器在没有返回预期资源时会静默失败,而其他浏览器则会报告错误.不过,在动态加载资源的情况下出错,是不太好做错误处理的.有时候,使用Ajax通信可能会提供关于错误条件的更多信息.
+
+### 区分重大与非重大错误
+任何错误处理策略中一个非常重要的方面就是确定某个错误是否为重大错误.具有以下一个或多个特性的错误属于非重大错误:
+- 不会影响用户的主要任务
+- 只会影响到页面中某个部分
+- 可以恢复
+- 重复操作可能成功
+
+对于非重大错误,无须给用户发送消息.可以将受影响的页面区域替换为一条消息,表示该功能暂时不能使用,但不需要中断用户体验.
+
+另一反面,重大错误具备如下特性:
+- 应用程序绝对无法继续运行
+- 错误严重影响了用户的主要目标
+- 会导致其他错误发生
+
+当重大错误发生时,应该立即发送消息让用户知晓自己不能再继续使用应用程序了.如果必须刷新页面才能恢复应用程序,那就应该明确告知用户,并提供一个自动刷新页面的按钮.
+
+代码中则不要区分是不是重大错误.非重大错误和重大错误的区别主要体现在对用户的影响上.好的代码设计意味着应用程序的某个部分的错误不会影响其他部分,实际上根本不应该相关.
+
+### 把错误记录到服务器中
+Web应用程序开发中的一个常见做法就是建立中心化的错误日志存储和追踪系统.数据库和服务器错误正常写到日志中并按照API加以分类.对复杂的Web应用程序而言,最好也把JS错误发送回服务器记录下来.这样做可以把错误记录到与服务器相同的系统,只要把它们归类到前端错误即可.使用相同的系统可以进行相同的分析,而不用考虑错误来源.
+
+要建立JS错误日志系统,首先需要在服务器上有页面或入口可以处理错误数据.该页面只要从查询字符串中取得错误数据,然后把它们保存到错误日志中即可.例如:
+````JS
+function logError(sev, msg) {
+    let img = new Image(),
+        encodeSev = encodeURIComponent(sev),
+        encodeMsg = encodeURIComponent(msg);
+    img.src = `log.php?sev=${encodedSev}&msg=${encodedMsg}`;
+}
+
+for (let mod of mods) {
+    try {
+        mod.init();
+    } catch (ex) {
+        logError(`nonfatal", "Module init failed: ${ex.message}`);
+    }
+}
+````
+上面使用`Image`对象发送请求只要是从灵活性方法考虑的:
+- 所有浏览器都支持`Image`对象,即使不支持`XMLHttpRequest`对象也一样.
+- 不受跨域规则限制.通常,接收错误消息的应该是多个服务器中的一个,而`XMLHttpRequest`此时就比较麻烦.
+- 记录错误的过程很少出错.大多数Ajax通信借助JS库的包装来处理.如果这个库本身出错,而你又要利用它记录错误,那么显然错误消息永远不会发给服务器.
+
+## 调试技术
+### 把消息记录到控制台
+所有主流浏览器都有JS控制台,该控制台可用于查询JS错误.另外,这些浏览器都支持通过`console`对象直接把JS消息写入控制台,这个对象包含如下方法:
+- `error(message)`:在控制台中记录错误消息.
+- `info(message)`:在控制台中记录消息性内容.
+- `log(message)`:在控制台记录常规消息.
+- `warn(message)`:在控制台中记录警告消息.
+
+记录消息时使用的方法不同,消息显示的样式也不同.错误消息包含一个红叉图标,而警告消息包含一个黄色叹号图标.
+
+在产品环境下应该删除所有调试相关代码.这可以在部署时使用代码自动完成清理,也可以手动删除.
+
+*注意:相比于使用警告框,打印日志消息是更好的调试方法.这是因为警告框会阻塞代码执行,从而影响对异步操作的计时,进而影响代码的结果.打印日志也可以随意输出任意多个参数并检查对象实例.(警告框只能将对象序列化为一个字符串再展示出来)*
+
+### 理解控制台运行时
+浏览器控制台是个读取-求值-打印-循环(REPL,read-eval-print-loop),与页面的JS运行时并发.这个运行时就像浏览器对新出现在DOM中的`<script>`标签求值一样.在控制台中执行的命令可以像页面级JS一样访问全局和各种API.控制台中可以执行任意数量的代码,与它可能会阻塞的任何页面级代码一样.修改,对象和回调都会保留在DOM和运行时中.
+
+JS运行时会限制不同窗口可以访问哪些内容,因而在所有主流浏览器中都可以选择在哪个窗口中执行JS控制台输入.你所执行的代码不会有特权提升,仍会受跨源限制和其他浏览器施加的控制规则约束.
+
+控制台运行时也会集成开发者工具,提供常规JS开发中所没有的上下文调试工具.其中一个非常有用的工具是最后点击选择器.在开发者工具的元素标签内,单击DOM树中一个节点,就可以在控制台标签页中使用`$0`引用该节点的JS实例.它就跟普通的JS实例一样,因此可以读取属性,或者调用成员方法.
+
+### 使用JS调试器
+所有主流浏览器都可以使用JS调试器.`debugger`关键字可以调用可能存在的调试功能.如果没有相关的功能,这条语句会被简单地跳过.可以像下面这样使用`debugger`关键字:
+````JS
+function pauseExecution() {
+    console.log("Will print before breakpoint");
+    debugger;
+    console.log("Will not print until breakpoint continue");
+}
+````
+
+在运行时碰到这个关键字,所有主流浏览器都会打开开发者工具面板,并在指定位置显示断点.然后,可以通过单独的浏览器控制台在断点所在的特定词法作用域中执行代码.此外,还可以执行标准的浏览器调试器操作(单步进入,单步跳过,继续,等等).
+
+浏览器也支持在开发者工具的源代码标签页中选择希望设置断点的代码行来手动设置断点.这样设置的断点与使用`debugger`关键字设置的一样,只是不会在不同浏览器会话之间保持.
+
+### 在页面中打印消息
+另一种常见的打印调试消息的方式是把消息写到页面中指定的区域.这个区域可以是所有页面中都包含的元素,但仅用于调试目的.也可以是在需要时临时创建的元素.例如,可以定义这样`log()`函数:
+````JS
+function log(message) {
+    const console = document.getElementById("debuginfo");
+    if (console === null) {
+        console = document.createElement("div");
+        console.id = "debuginfo";
+        console.style.background = "#dedede";
+        console.style.border = "1px solid silver";
+        console.style.padding = "5px";
+        console.style.width = "400px";
+        console.style.position = "absolute";
+        console.style.right = "0px";
+        console.style.top = "0px";
+        document.body.appendChild(console);
+    }
+    console.innerHTML += `<p>${message}</p>`;
+}
+````
+
+### 补充控制台方法
+由于`console`是一个全局对象,所以可以为这个对象添加方法,也可以用自定义函数重写已有的方法.
+
+### 抛出错误
+抛出错误是调试代码的很好方式.如果错误消息足够具体,只要看一眼就可以确定原因.好的错误消息包含关于错误原因的确切信息,因此可以减少额外的调试的工作量.比如:
+````JS
+function assert(condition, message) {
+    if (!condition) {
+        throw new Error(message);
+    }
+}
+function divide(num1, num2) {
+    assert(typeof num1 == "number" && typeof num2 == "number",
+           "divide(): Both arguments must be numbers.");
+    return num1 / num2;
+}
+````
+
+## 旧版IE的常见错误
+IE已死,所以该部分内容就直接跳过了.
+
+# 处理XML
 
