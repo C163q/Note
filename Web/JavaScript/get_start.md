@@ -905,6 +905,30 @@
     - [其他事件](#其他事件)
   - [安全](#安全)
 - [客户端存储](#客户端存储)
+  - [cookie](#cookie)
+    - [限制](#限制)
+    - [cookie的构成](#cookie的构成)
+    - [JS中的cookie](#js中的cookie)
+    - [子cookie](#子cookie)
+    - [使用cookie的注意事项](#使用cookie的注意事项)
+  - [Web Storage](#web-storage)
+    - [Storage类型](#storage类型)
+    - [sessionStorage对象](#sessionstorage对象)
+    - [localStorage对象](#localstorage对象)
+    - [存储事件](#存储事件)
+    - [限制](#限制-1)
+  - [IndexedDB](#indexeddb)
+    - [数据库](#数据库)
+    - [对象存储](#对象存储)
+    - [事务](#事务)
+    - [插入对象](#插入对象)
+    - [通过游标查询](#通过游标查询)
+    - [键范围](#键范围)
+    - [设置游标的方向](#设置游标的方向)
+    - [索引](#索引)
+    - [并发问题](#并发问题)
+    - [限制](#限制-2)
+- [模块](#模块)
 
 # 认识JavaScript
 `JavaScript`包含: 核心(ECMAScript), 文档对象模型(DOM), 浏览器对象模型(BOM).
@@ -18824,4 +18848,557 @@ socket.addEventListener("message", (event) => {
 - 基于`cookie`验证(同样很容易伪造).
 
 # 客户端存储
+## cookie
+`HTTP cookie`通常也叫作`cookie`,最初用于在客户端存储会话信息.这个规范要求服务器在响应`HTTP`请求时,通过发送`Set-Cookie` HTTP头部包含会话信息.
+
+例如,下面是包含这个头部的一个HTTP响应:
+```
+HTTP/1.1 200 OK
+Content-type: text/html
+Set-Cookie: name=value
+Other-header: other-header-value
+```
+
+这个HTTP响应会设置一个名为`"name"`,值为`"value"`的`cookie`.名和值在发送时都会经过URL编码.浏览器会存储这些会话信息,并在之后的每个请求中都会通过HTTP头部`cookie`再将它们发回服务器,比如:
+```
+GET /index.js1 HTTP/1.1
+Cookie: name=value
+Other-header: other-header-value
+```
+
+这些发送回服务器的额外信息可用于唯一标识发送请求的客户端.
+
+### 限制
+`cookie`是与特定域绑定的.设置`cookie`后,它会与请求一起发送到创建它的域.这个限制能保证`cookie`中存储的信息只对被认可的接收者开放,不被其他域访问.
+
+因为`cookie`存储在客户端机器上,所以为保证它不会被恶意利用,浏览器会施加限制.同时,`cookie`也不会占用太多磁盘空间.
+
+通常,只要遵守以下大致的限制,就不会在任何浏览器中碰到问题:
+- 不超过300个cookie
+- 每个cookie不超过4096字节
+- 每个域不超过20个cookie
+- 每个域不超过81920字节
+
+每个域能设置的`cookie`总数是受限的,但不同浏览器的限制不同.如果`cookie`总数超过了单个域的上限,浏览器就会删除之前设置的cookie.
+
+浏览器也会限制`cookie`的大小,大多数浏览器对`cookie`的限制是不超过4096字节,上下可以有一个字节的误差.为跨浏览器兼容,最好保证`cookie`的大小不超过4095字节.如果创建的`cookie`超过最大限制,则该`cookie`会被静默删除.
+
+### cookie的构成
+`cookie`在浏览器中是由以下参数构成的:
+- **名称**:唯一标识`cookie`的名称.`cookie`名不区分大小写,因此`myCookie`和`MyCookie`是同一个名称.不过,实践中最好将`cookie`名当成区分大小写来对待,因为一些服务器软件可能这样对待它们.`cookie`名必须经过URL编码.
+- **值**:存储在`cookie`里的字符串值.这个值必须经过URL编码.
+- **域**:`cookie`有效的域.发送到这个域的所有请求都会包含对应的`cookie`.这个值可能包含子域(如`www.example.org`),也可以不包含(如`.example.org`表示对`example.org`的所有子域都有效).
+- **路径**:请求URL中包含这个路径才会把`cookie`发送到服务器.例如,可以指定`cookie`只能由`http://www.example.org/path/`访问,因此访问`http://www.example.com/`下的页面就不会发送cookie,即使请求的是同一个域.
+- **过期时间**:表示何时删除cookie的时间戳(即什么时间之后就不发送到服务器了).默认情况下,浏览器会话结束后会删除所有`cookie`.不过,也可以设置删除`cookie`的具体时间.这样即使关闭浏览器,`cookie`也会保留在用户机器上.把过期时间设置为过去的时间会立即删除`cookie`.
+- **安全标志**:设置之后,只在使用SSL安全连接的情况下才会把`cookie`发送到服务器.例如,请求`https://www.example.com`会发送`cookie`,而请求`http://www.example.com`则不会.
+
+这些参数在`Set-Cookie`头部中使用分号加空格隔开:
+```
+HTTP/1.1 200 OK
+Content-type: text/html
+Set-Cookie: name=value; expires=Wed, 22-Jan-25 07:08:33 GMT; domain=.example.org; path=/path/; secure
+Other-header: other-header-value
+```
+上面设置的`cookie`名为`name`,这个`cookie`在2025年1月22日7:08:33过期,对`www.example.org`及其他`example.org`的子域有效,但路径必须是`/path/`,只能在SSL上发送,因为设置了`secure`标志.
+
+域,路径,过期时间和`secure`标志用于告诉浏览器什么情况下应该在请求中包含`cookie`.这些参数并不会随请求发送给服务器,实际发送的只有`cookie`的名值对.
+
+### JS中的cookie
+[相关链接](https://developer.mozilla.org/zh-CN/docs/Web/API/Document/cookie)
+
+在JS中处理`cookie`比较麻烦,由于接口过于简单,只有BOM的`document.cookie`属性.根据用法不同,该属性的表现迥异.
+
+要使用该属性获取值时,`document.cookie`返回包含页面所有有效`cookie`的字符串(根据域,路径,过期时间和安全设置),以分号分隔:`name1=value1;name2=value2;name3=value3`.所有名和值都是URL编码的,因此必须使用`documentURIComponent()`解码.
+
+在设置值时,可以通过`document.cookie`属性设置新的`cookie`字符串.这个字符串在被解析后会添加到原有`cookie`中.设置`document.cookie`不会覆盖之前存在的任何`cookie`,除非设置了已有的`cookie`.设置`cookie`的格式如下,与`Set-Cookie`头部的格式一样:`name=value;expires=expiration_time;path=domain_path;domain=domain_name;secure`.
+
+在所有这些参数中,只有`cookie`的名称和值是必需的.例如:
+````JS
+document.cookie = encodeURIComponent("name") + "=" +    // 不要把=包含在encodeURIComponent()中,否则会被编码为%3D
+                  encodeURIComponent("aaa");    // 这里虽然没有字符需要编码,但最好还是使用encodeURIComponent()
+````
+
+要给已经创建的`cookie`指定额外信息,只要针对已有的`name`再次写入就可以了:
+````JS
+document.cookie = encodeURIComponent("name") + "=" +
+                  encodeURIComponent("aaa") + "; domain=.example.org; path=/";
+````
+
+为了删除已有的cookie方法,需要再次设置同名`cookie`(包括相同路径,域和安全选项),但要将其过期时间设置为某个过去的时间.
+
+为了方便`cookie`的设置,给出以下类:
+````JS
+class CookieUtil {
+    static get(name) {
+        let cookie = decodeURIComponent(document.cookie),
+            cookieName = `${name}=`,
+            cookieStart = cookie.indexOf(cookieName),
+            cookieValue = null;
+        if (cookieStart > -1) {
+            let cookieEnd = cookie.indexOf(";", cookieStart);
+            if (cookieEnd == -1) {
+                cookieEnd = cookie.length;
+            }
+            cookieValue = decodeURIComponent(cookie.substring(cookieStart + cookieName.length, cookieEnd));
+        }
+        return cookieValue;
+    }
+    static set(name, value, expires, path, domain, secure) {
+        let cookieText = `${encodeURIComponent(name)}=${encodeURIComponent(value)}`
+        if (expires instanceof Date) {
+            cookieText += `; expires=${expires.toGMTString()}`;
+        }
+        if (path) {
+            cookieText += `; path=${encodeURIComponent(path)}`;
+        }
+        if (domain) {
+            cookieText += `; domain=${encodeURIComponent(domain)}`
+        }
+        if (secure) {
+            cookieText += `; secure`;
+        }
+        document.cookie = cookieText;
+    }
+    static unset(name, path, domain, secure) {
+        CookieUtil.set(name, "", new Date(0), path, domain, secure);
+    }
+};
+````
+
+### 子cookie
+为绕过浏览器对每个域`cookie`数的限制,有些开发者提出了`子cookie`的概念,子cookie是在单个cookie存储的小块数据,本质上是使用cookie的值在单个cookie中存储多个名值对.最常用的子cookie模式如下:`name=name1=value1&name2=value2&name3=value3`.
+
+子cookie的格式类似于查询字符串.这些值可以存储为单个cookie,而不用单独存储为自己的名值对,结果就是网站或`Web`应用程序能够在单域cookie数限制下存储更多的结构化数.
+
+要操作`子cookie`,就需要再添加一些辅助方法.给出以下辅助类:
+````JS
+class SubCookieUtil {
+    static get(name, subName) {
+        let subCookies = SubCookieUtil.getAll(name);
+        return subCookies ? subCookies[subName] : null;
+    }
+
+    static getAll(name) {
+        let cookie = decodeURIComponent(document.cookie),
+            cookieName = name + "=",
+            cookieStart = cookie.indexOf(cookieName),
+            cookieValue = null,
+            cookieEnd,
+            subCookies,
+            parts,
+            result = {};
+        if (cookieStart > -1) {
+            cookieEnd = cookie.indexOf(";", cookieStart);
+            if (cookieEnd == -1) {
+                cookieEnd = cookie.length;
+            }
+            cookieValue = cookie.substring(cookieStart + cookieName.length, cookieEnd);
+            if (cookieValue.length > 0) {
+                subCookies = cookieValue.split("&");
+                for (let i = 0, len = subCookies.length; i < len; ++i) {
+                    parts = subCookies[i].split("=");
+                    result[parts[0]] = parts[1];
+                }
+            }
+            return result;
+        }
+        return null;
+    }
+
+    static set(name, subName, value, expires, path, domain, secure) {
+        let subCookies = SubCookieUtil.getAll(name) || {};
+        subCookies[subName] = value;
+        SubCookieUtil.setAll(name, subCookies, expires, path, domain, secure);
+    }
+
+    static setAll(name, subcookies, expires, path, domain, secure) {
+        let cookieText = name + "=",
+            subcookiesParts = new Array(),
+            subName;
+        for (subName in subcookies) {   // null传入则什么都不会发生
+            subcookiesParts.push(encodeURIComponent(subName + "=" + subcookies[subName]));
+        }
+        if (cookieParts.length > 0) {
+            cookieText += subcookiesParts.join(encodeURIComponent("&"));
+            // 以下设置需要针对cookie本身而非子cookie
+            if (expires instanceof Date) {
+                cookieText += `; expires=${expires.toGMTString()}`;
+            }
+            if (path) {
+                cookieText += `; path=${encodeURIComponent(path)}`;
+            }
+            if (domain) {
+                cookieText += `; domain=${encodeURIComponent(domain)}`
+            }
+            if (secure) {
+                cookieText += `; secure`;
+            }
+        } else {
+            // 表明该cookie需要删除
+            cookieText += `; expires=${(new Date(0)).toGMTString()}`;
+        }
+        document.cookie = cookieText;
+    }
+
+    static unset(name, subName, path, domain, secure) {
+        let subcookies = SubCookieUtil.getAll(name);
+        if (subcookies) {
+            delete subcookies[subName];
+            SubCookieUtil.setAll(name, subcookies, null, path, domain, secure);
+        }
+    }
+
+    static unsetAll(name, path, domain, secure) {
+        SubCookieUtil.setAll(name, null, new Date(0), path, domain, secure);
+    }
+}
+````
+
+使用子cookie要特别注意cookie的大小,不要超过对单个cookie大小的限制.
+
+### 使用cookie的注意事项
+还有一种叫作`HTTP-only`的`cookie`.`HTTP-only`可以在浏览器设置,也可以在服务器设置,但只能在服务器上读取,这是因为JS无法取得这种`cookie`的值.
+
+因为所有cookie都会作为请求头部由浏览器发送给服务器,所以在cookie中保存大量信息可能会影响特定域浏览器请求的性能.保存的cookie越大,请求完成的时间就越长.即使浏览器对cookie大小有限制,最好还是尽可能在cookie中只保存必要信息,以避免性能问题.
+
+对cookie的限制及其特性决定了cookie并不是存储大量数据的理想方式.因此,其他客户端存储技术出现了.
+
+**注意:不要在cookie中存储重要或敏感的信息.cookie数据不是保存在安全的环境中的,因此任何人都可能获得.应该避免把信用卡号或个人地址等信息保存在cookie中.**
+
+## Web Storage
+`Web Storage`的目的是解决通过客户端存储不需要频繁发送回服务器的数据时使用`cookie`的问题.
+
+[MDN-Web Storage API](https://developer.mozilla.org/zh-CN/docs/Web/API/Web_Storage_API)
+
+`Web Storage`主要的目标是:
+- 提供在`cookie`之外的存储会话数据的途径
+- 提供跨会话持久化存储大量数据的机制
+
+`Web Storage`定义了两个对象:`localStorage`和`sessionStorage`.`localStorage`是永久存储机制,`sessionStorage`是跨会话的存储机制.这两种浏览器存储API提供了在浏览器中不受页面刷新影响而存储数据的两种方式.
+
+### Storage类型
+`Storage`类用于保存名值对数据,直至存储空间上限(由浏览器决定).`Storage`的实例与其他对象(`Object`)一样,但增加了以下方法:
+- `clear()`:删除所有值.
+- `getItem(name)`:取得给定`name`的值.
+- `key(index)`:取得给定数值位置的名称.
+- `removeItem(name)`:删除给定`name`的名值对.
+- `setItem(name, value)`:设置给定`name`的值.
+
+既可以使用上面的这些方法,也可以直接使用`.`和`[]`来访问和设置这些属性,也可以使用`delete`来删除属性,因为其本质上就是`Object`.但还是建议使用上面的方法来执行这些操作.
+
+还可以通过`length`属性确定`Storage`对象中存储了多少名值对.但无法确定对象中所有数据占用的空间大小.
+
+`Storage`类型只能存储字符串.非字符串数据在存储之前会自动转换为字符串.注意,这种转换不能在获取数据时撤销.
+
+### sessionStorage对象
+`sessionStorage`对象只存储会话数据,这意味着数据只会存储到浏览器关闭.这跟浏览器关闭时会消失的会话`cookie`类似.存储在`sessionStorage`中的数据不受页面刷新影响,可以在浏览器崩溃并重启后恢复(取决于浏览器).
+
+因为`sessionStorage`对象与服务器会话紧密相关,所以在运行本地文件时不能使用.存储在`sessionStorage`对象中的数据对于不同页面(不同URL)之间是互相独立的.
+
+`window.sessionStorage`对象是`Storage`实例,所以可以直接使用其实例方法:
+````JS
+sessionStorage.setItem("name", "aaa");
+````
+
+所有现代浏览器在实现存储写入时都使用了同步阻塞方式,因此数据会立即提交到存储.具体API实现可能不会立即把数据写入磁盘,但这个区别在JS层面不可见.通过`Web Storage`写入的任何数据都可以立即被读取.
+
+### localStorage对象
+`localStorage`取代了`globalStorage`,作为在客户端持久存储数据的机制.要访问同一个`localStorage`对象,页面必须来自同一个域(子域不可以),在相同的端口上使用相同的协议.
+
+因为`window.localStorage`是`Storage`的实例,所以可以使用`Storage`的实例方法:
+````JS
+localStorage.setItem("name", "aaa");
+````
+
+这两种存储方法的区别在于,存储在`localStorage`中的数据会保留到通过JS删除或者用户清除浏览器缓存.`localStorage`数据不受页面刷新影响,也不会因关闭窗口,标签页或重新启动浏览器而丢失.
+
+### 存储事件
+每当`Storage`对象变化时,都会在文档上触发`storage`事件.使用属性或`setItem()`设置值,使用`delete`或`removeItem()`删除值,以及每次调用`clear()`时都会触发这个事件.这个事件的`event`对象有如下4个属性:
+- `domain`:存储变化对应的域.
+- `key`:被设置或删除的键.
+- `newValue`:键被设置的新值,若键被删除则为`null`.
+- `oldValue`:键变化之前的值.
+
+注意:若页面A和B为同一域名的不同页面,页面A中注册了事件处理程序`storage`,则在页面B上对于`Storage`对象的修改会被页面A上的事件处理程序所接收.
+
+使用例:
+````JS
+window.addEventListener("storage",
+    (event) => console.log(`Storage changed for ${event.domain}`));
+````
+
+对于`sessionStorage`和`localStorage`上的任何修改都会触发`storage`事件,但`storage`事件不会区分这两者.
+
+### 限制
+与其他客户端存储方案一样,`Web Storage`也有限制.具体的限制取决于特定的浏览器.一般来说,客户端数据的大小限制是按照每个源(协议,域,端口)来设置的,因此每个源有固定大小的存储空间.分析存储数据的页面的源可以加强这一限制.
+
+不同浏览器给`localStorage`和`sessionStorage`设置了不同的空间限制,但大多数会限制为每个源`5MB`.
+
+详细信息可参考:
+- [web.dev-Storage for the Web](https://web.dev/articles/storage-for-the-web?hl=en)
+- [dev-test.nemikor.com-Web Storage Support Test](http://dev-test.nemikor.com/web-storage/support-test/)
+
+## IndexedDB
+`Indexed Database API`简称`IndexedDB`,是浏览器中存储结构化数据的一个方案.`IndexedDB`用于代替目前已废弃的`Web SQL Database API`.`IndexedDB`背后的思想是创造一套API,方便JS对象的存储和获取,同时也支持查询和搜索.
+
+`IndexedDB`的设计几乎完全是异步的.为此,大多数浏览器操作以请求的形式执行,这些请求会异步执行,产生成功的结果或错误.绝大多数`IndexedDB`操作要求添加`error`和`success`事件处理程序来确定输出.
+
+*较旧的浏览器可能不支持IndexDB.*
+
+详见:[MDN-IndexDB](https://developer.mozilla.org/zh-CN/docs/Web/API/IndexedDB_API)
+
+### 数据库
+`IndexedDB`是类似于`MySQL`或`Web SQL Database`的数据库.与传统数据库的最大区别在于,`IndexedDB`使用对象存储而不是表格保存数据.`IndexedDB`数据库就是在一个公共命名空间下的一组对象存储,类似于`NoSQL`风格的实现.
+
+使用`IndexedDB`数据库的第一步是调用`indexedDB.open()`方法,并给它传入一个要打开的数据库名称.如果给定名称的数据库已存在,则会发送一个打开它的请求;如果不存在,则会发送创建并打开这个数据库的请求.这个方法会返回一个`IDBRequest`的实例,可以在这个实例上添加`error`和`success`事件处理程序:
+````JS
+let db,
+    request,
+    version = 1;
+request = indexedDB.open("admin", version);
+request.onerror = (event) => console.log(`Failed to open: ${event.target.errorCode}`);
+request.onsuccess = (event) => {
+    db = event.target.result;
+}
+````
+
+`open()`函数的第二个参数是要打开的数据库的版本.这个版本号会被转换为一个`unsigned long long`数值,因此不要使用小数.
+
+在两个事件处理程序中,`event.target`都指向`IDBRequest`实例,如果`success`事件处理程序被调用,说明可以通过`event.target.result`访问数据库(`IDBDatabase`)实例了.如果`error`事件处理程序被调用,`event.target.errorCode`中就会存储表示问题的错误码.
+
+### 对象存储
+例如,要存储以下记录:
+````JS
+let user = {
+    username: "007",
+    firstName: "James",
+    lastName: "Bond",
+    password: "foo"
+};
+````
+这个对象最适合作为对象存储键的是`username`属性.该属性必须全局唯一,它也是大多数情况下访问数据的凭据.这个键很重要,因为创建对象存储时必须指定一个键.
+
+当你创建一个**新的数据库**或者**增加已存在的数据库的版本号**(当打开数据库时,指定一个比之前更大的版本号),会触发`upgradeneeded`事件,`IDBVersionChangeEvent`对象会作为参数传递给绑定在`request.result`(例如示例中的`db`)上的`versionchange`事件处理器.在 `upgradeneeded`事件的处理器中,你应该创建该数据库版本需要的*对象存储*(object store):
+````JS
+// MDN上的示例
+request.onupgradeneeded = (event) => {
+  // 保存 IDBDatabase 接口
+  const db = event.target.result;   // db是IDBDatabase实例
+  // db.versionchange是IDBVersionChangeEvent实例
+  // 为数据库创建对象存储（objectStore）
+  const objectStore = db.createObjectStore("users", { keyPath: "username" });
+};
+````
+这里第二个参数的`keyPath`属性表示应该用作键的存储对象的属性名.
+
+在这种情况下(指触发`upgradeneeded`事件),数据库会保留之前版本数据库的对象存储,因此你不必再次创建这些对象存储.你需要创建新的对象存储,或删除不再需要的上一版本中的对象存储.如果你需要修改一个已存在的对象存储(例如要修改`keyPath`),你必须先删除原先的对象存储,然后使用新的选项再次创建.(注意,这样会丢失对象存储中的数据,如果你需要保存这些信息,你要在数据库版本更新前读取出来并保存在别处).
+
+尝试创建一个与已存在(重名)的对象存储(或删除一个不存在的对象存储)会抛出错误.
+
+### 事务
+创建了对象存储之后,剩下的所有操作都是通过**事务**完成的.事务要通过调用数据库对象的`transaction()`方法创建.任何时候,之啊哟想要读取或修改数据,都要通过事务把所有修改操作组织起来.最简单的情况下,可以像下面这样创建事务:`let transaction = db.transaction();`.
+
+如果不指定参数,则对数据库中所有的对象存储有只读权限.更具体的方式是指定一个或多个要访问的对象存储的名称:
+````JS
+let t1 = db.transaction("users");   // 访问一个对象存储
+let t2 = db.transaction(["users", "anotherStore"]); // 访问多个对象存储
+````
+
+上面创建的事务都是只读访问的.要修改访问模式,可以传入第二个参数.这个参数应该是下列三个字符串之一:`"readonly"`,`"readwrite"`或`"versionchange"`.比如:`let transaction = db.transaction("users", "readwrite");`.
+
+有了事务的引用,就可以使用`objectStore()`方法并传入对象存储的名称以访问特定的存储对象.然后,可以使用`add()`和`put()`方法添加和更新对象,使用`get()`取得对象,使用`delete()`删除对象,使用`clear()`删除所有对象.其中,`get()`和`delete()`方法都接收对象键作为参数,这5个方法都创建新的请求对象:
+````JS
+const transaction = db.transaction("users"),
+      store = transaction.objectStore("users"),
+      request = store.get("007");
+request.onerror = (event) => console.log("Did not get the object!");
+request.onsuccess = (event) => cosole.log(event.target.result.firstName);
+````
+
+因为一个事务可以完成任意多个请求,所以事务对象本身也有事件处理程序:`error`和`complete`.这两个事件可以用来获取事务级的状态信息:
+````JS
+transaction.onerror = (event) => {
+    // 整个事务被取消
+};
+transaction.oncomplete = (event) => {
+    // 整个事务成功完成
+};
+````
+
+注意,不能通过`oncomplete`事件处理程序的`event`对象访问`get()`请求返回的任何数据.
+
+### 插入对象
+`add()`或`put()`都接收一个参数,即要存储的对象,并把对象保存到对象存储,这两个方法只在对象存储中已存在同名的键时有区别.这种情况下,`add()`会导致错误,而`put()`会简单地重写该对象.
+
+每次调用`add()`或`put()`都会创建对象存储的新更新请求.如果想验证成功与否,可以把请求对象保存到一个变量,然后为它添加`error`和`success`事件处理程序:
+````JS
+// users是一个用户数据的数组
+let request,
+    requests = [];
+for (let user of users) {
+    request = store.add(user);
+    request.onerror = () => {
+        // 处理错误
+    };
+    request.onsuccess = () => {
+        // 处理成功
+    };
+    requests.push(request);
+}
+````
+
+### 通过游标查询
+使用事务可以通过一个已知键取得一条记录.如果想取得多条数据,则需要在事务中创建一个游标.游标是一个指向结果集的指针.与传统的数据库查询不同,游标不会事先收集所有结果.相反,游标指向第一个结果,并在接到指定前不会主动查找下一条数据.
+
+需要在对象存储上调用`openCursor()`方法创建游标.`openCursor()`方法也返回一个请求,因此必须为它添加`success`和`error`事件处理程序:
+````JS
+const transaction = db.transaction("users"),
+      store = transaction.objectStore("users"),
+      request = store.openCursor();
+request.onsuccess = (event) => {
+    // 处理成功
+};
+request.onerror = (event) => {
+    // 处理错误
+};
+````
+
+在调用`success`事件处理程序时,可以通过`event.target.result`访问存储中下一条记录,这个属性中保存着`IDBCursor`实例(有下一条记录时)或`null`(没有记录时).这个`IDBCursor`实例有几个属性:
+- `direction`:字符串常量,表示游标的前进方向以及是否应该遍历所有重复的值.可能的值包括:
+  - `NEXT("next")`
+  - `NEXTUNIQUE("nextunique")`
+  - `PREV("prev")`
+  - `PREVUNIQUE("prevunique")`
+- `key`:对象的键.
+- `value`:实际的对象.
+- `primaryKey`:游标使用的键.可能是对象键或索引键(见下文).
+
+````JS
+request.onsuccess = (event) => {
+    const cursor = event.target.result;
+    if (cursor) {   // 永远要检查,因为如果没有下一条记录,cursor为null
+        console.log(`Key: ${cursor.key}, Value: ${JSON.stringify(cursor.value)}`);
+        // cursor.value返回的是实际的对象,使用JSON.stringify()是为了方便显示
+    }
+};
+````
+
+游标(上例中的`cursor`)可用于更新个别记录.`update()`方法使用指定的对象更新当前游标对应的值.其返回一个请求,也需要为它添加`success`和`error`事件处理程序.
+
+游标上的`delete()`方法可以删除游标位置的记录,返回一个请求.
+
+如果事务没有修改对象的权限,`update()`和`delete()`都会抛出错误.
+
+默认情况下,每个游标只会创建一个请求.要创建另一个请求,必须调用下列中的一个方法:
+- `continue(key)`:移动到结果集中的下一条记录.参数`key`是可选的.如果没有指定`key`,游标就移动到下一条记录;如果指定了,则游标移动到指定的键.
+- `advance(count)`:游标向前移动指定的`count`条记录.
+
+这两个方法都会让游标重用相同的请求,因此也会重用`success`和`error`处理程序.
+
+### 键范围
+使用**键范围**可以让游标更容易管理.键范围对应`IDBKeyRange`的实例.
+
+有四种方式指定键范围,第一种是使用`only()`方法并传入想要获取的键:`const onlyRange = IDBKeyRange.only("007");`.这个范围保证只获取键为`"007"`的值.使用这个范围创建的游标类似于直接访问对象存储并调用`get("007")`.
+
+第二种键范围可以定义结果集的下限.下限表示游标开始的位置.例如:`const lowerRange = IDBKeyRange.lowerBound("007");`保证游标从`"007"`这个键开始,直到最后.
+
+如果想从`"007"`这个键后面的一条记录开始,可以再传入第二个参数`true`:`const lowerRange = IDBKeyRange.lowerBound("007", true);`
+
+第三种见范围可以定义结果集的上限,通过调用`upperBound()`方法可以指定游标不会越过的记录,例如:`const upperRange = IDBKeyRange.upperBound("end");`.该键范围保证游标从头开始并在到达键为`"end"`的记录停止.如果不想包含指定的键,可以在第二个参数传入`true`.
+
+要同时指定下限和上限,可以使用`bound()`方法.这个方法接收四个参数:下限的键,上限的键,两个可选的布尔值分别表示是否跳过下限和上限.例如:`const boundRange = IDBKeyRange.bound("007", "end", false, true);`.
+
+定义了范围之后,把它传给`openCursor()`方法,就可以得到位于该范围内的游标:
+````JS
+const transaction = db.transaction("users"),
+      store = transaction.objectStore("users"),
+      range = IDBKeyRange.bound("007", "end");
+      request = store.openCursor(range);
+request.onsuccess = (event) => {
+    const cursor = event.target.result;
+    if (cursor) {
+        console.log(`Key: ${cursor.key}, Value: ${JSON.stringify(cursor.value)}`);
+        cursor.continue();
+    } else {
+        console.log("Done!");
+    }
+};
+````
+
+### 设置游标的方向
+`openCursor()`方法可以接收两个可选参数,第一个是`IDBKeyRange`的实例,第二个是表示方向的字符串.通常,游标都是从对象存储的第一条记录开始,每次调用`continue()`或`advance()`都会向后一条记录前进,即默认为`"next"`.
+
+向第二个参数中传入[通过游标查询](#通过游标查询)中提到的`direction`属性中的字符串,可以指定方向:
+````JS
+const transaction = db.transaction("users"),
+      store = transaction.objectStore("users"),
+      request = store.openCursor(null, "nextunique");
+````
+
+对于`"prev"`和`"prevunique"`,会从最后一项开始向第一项移动.
+
+### 索引
+对于某些数据集,可能需要为对象存储指定多个键.例如,如果同时记录了用户ID和用户名,那可能需要通过任何一种方式来获取用户数据.为此,可以考虑将用户ID作为主键,然后在用户名上创建索引.
+
+要创建索引,首先要取得对象存储的引用,然后调用`createIndex()`:
+````JS
+const transaction = db.transaction("users"),
+      store = transaction.objectStore("users"),
+      index = store.createIndex("username", "username", {unique: true});
+````
+`createIndex()`的第一个参数是索引的名称,第二个参数是索引属性的名称,第三个参数是包含键`unique`的`options`对象.这个选项中的`unique`应该必须指定,表示这个键是否在所有记录中唯一.
+
+`createIndex`返回的是`IDBIndex`实例.在对象存储上调用`index()`方法也可以得到同一个实例.例如,要使用一个已存在的名为`"username"`的索引,可以像下面这样:
+````JS
+const transaction = db.transaction("users"),
+      store = transaction.objectStore("users"),
+      index = store.index("username");
+````
+
+可以在索引上使用`openCursor()`方法创建游标,这个游标与在对象存储上的游标完全一样.只是其`result.key`属性中保存的是索引键,而不是主键.
+
+使用`openKeyCursor()`方法也可以在索引上创建特殊游标,只返回每条记录的主键.这个方法接收的参数与`openCursor()`一样.最大的不同在于,`event.result.key`是索引键,`event.result.value`是主键而不是整条记录.
+
+可以使用`get()`方法并传入索引键通过索引得到单条记录,这会创建一个新请求.
+
+如果想只取得给定索引键的主键,可以使用`getKey()`方法.这样也会创建一个新请求,但`result.value`等于主键而不是整个记录.
+
+任何时候,都可以使用`IDBIndex`对象的下列属性取得索引的相关信息:
+- `name`:索引的名称.
+- `keyPath`:调用`createIndex()`时传入的属性路径.
+- `objectStore`:索引对应的对象存储.
+- `unique`:表示索引键是否唯一的布尔值.
+
+对象存储自身也有一个`indexNames`属性,保存着与之相关索引的名称的数组.
+
+在对象存储上调用`deleteIndex()`方法并传入索引的名称可以删除索引.因为删除索引不会影响对象存储中的数据,所以这个操作没有回调.
+
+### 并发问题
+`IndexDB`虽然是网页中的异步API,但仍存在并发问题.如果两个不同的浏览器标签页同时打开了同一个网页,则有可能出现一个网页尝试升级数据库而另一个尚未就绪的情形.有问题的操作是设置数据库为新版本,而版本变化只能在浏览器只有一个标签页使用数据库时才能完成.
+
+第一次打开数据库时,添加`versionchange`事件处理程序非常重要.另一个同源标签页将数据库打开到新版本时,将执行此回调.对这个事件最好的响应是立即关闭数据库,以便完成版本升级.(即标签页A**正在**更新数据库,同源标签页B打开数据库时将接收到`versionchange`事件)
+
+````JS
+let request, database;
+request = indexedDB.open("admin", 1);
+request.onsuccess = (event) => {
+    database = event.target.result;
+    database.onversionchange = () => database.close();
+};
+````
+
+始终都指定这些事件处理程序,可以保证Web应用程序能够更好地处理与`IndexedDB`相关的并发问题.
+
+关于此方面的问题,也可以看[MDN上相关的页面](https://developer.mozilla.org/zh-CN/docs/Web/API/IndexedDB_API/Using_IndexedDB#%E5%BD%93%E4%B8%80%E4%B8%AA_web_%E5%BA%94%E7%94%A8%E5%9C%A8%E5%8F%A6%E4%B8%80%E4%B8%AA%E6%A0%87%E7%AD%BE%E9%A1%B5%E4%B8%AD%E8%A2%AB%E6%89%93%E5%BC%80%E6%97%B6%E7%9A%84%E7%89%88%E6%9C%AC%E5%8F%98%E6%9B%B4)
+
+### 限制
+`IndexedDB`数据库是与页面源(协议,域,端口)绑定的,因此信息不能跨源共享.这意味着`www.example.org`和`p2p.example.org`会对应不同的数据存储.
+
+其次,每个源都有可以存储的空间限制.详见[MDN-浏览器存储限制和回收标准](https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria).
+
+此外,有些浏览器中,本地网页不能访问`IndexedDB`数据库.
+
+这些数据都没有被加密,所以要注意不能使用它们存储敏感信息.
+
+# 模块
 
