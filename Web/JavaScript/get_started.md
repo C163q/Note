@@ -950,6 +950,13 @@
     - [工作者模块](#工作者模块)
     - [向后兼容](#向后兼容)
 - [工作者线程](#工作者线程)
+  - [工作者线程简介](#工作者线程简介)
+    - [工作者线程与线程](#工作者线程与线程)
+    - [工作者线程的类型](#工作者线程的类型)
+    - [WorkerGlobalScope](#workerglobalscope)
+      - [WorkerGlobalScope属性和方法](#workerglobalscope属性和方法)
+      - [WorkerGlobalScope的子类](#workerglobalscope的子类)
+  - [专用工作者线程](#专用工作者线程)
 
 # 认识JavaScript
 `JavaScript`包含: 核心(ECMAScript), 文档对象模型(DOM), 浏览器对象模型(BOM).
@@ -19942,4 +19949,79 @@ const moduleWorker = new Worker('moduleWorker.js', { type: 'module' });
 ````
 
 # 工作者线程
+JS是单线程的,因为像DOM这样的API只能在单线程下执行.但并不意味着不能像多线程语言那样把工作委托给独立的线程执行并发更改,这也就是工作者线程的功能.
+
+工作者线程的价值在于:允许把主线程的工作转嫁给独立的实例,而不改变现有的单线程模型.
+
+[MDN-使用Web Worker](https://developer.mozilla.org/zh-CN/docs/Web/API/Web_Workers_API/Using_web_workers)
+
+## 工作者线程简介
+JS环境实际上是运行在托管操作系统中的虚拟环境.在浏览器每打开一个页面,就会分配一个它自己的环境.这样,每个页面都有自己的内存,事件循环,DOM,等等.每个页面就相当于沙盒,不会干扰其他页面.对于浏览器来说,同时管理多个环境是非常简单的,因为所有这些环境都是*并行*执行的.
+
+使用*工作者线程*,浏览器可以在原始页面环境之外再分配一个完全独立的二级子环境.这个子环境**不能**与依赖单线程交互的API(如DOM)互操作,但可以与父环境并行执行代码.
+
+[MDN-Web Worker API](https://developer.mozilla.org/zh-CN/docs/Web/API/Web_Workers_API)
+
+### 工作者线程与线程
+工作者线程和线程之间有很多相似之处:
+- **工作者线程是以实际线程实现的**.
+- **工作者线程并行执行**:虽然页面和工作者线程都是单线程JS环境,每个环境中的指令则可以并行执行.
+- **工作者线程可以共享某些内存**:工作者线程能够使用`SharedArrayBuffer`在多个环境间共享内容.虽然线程会使用锁实现并发控制,但JS使用`Atomics`接口实现并发控制.
+
+工作者线程与线程也有不同之处:
+- **工作者线程不共享全部内存**:传统多线程模型有能力读写共享内存空间.但工作者线程进出数据需要复制或转移(除了`SharedArrayBuffer`).
+- **工作者线程不一定在同一个进程里**:通常,一个进程可以在内部产生多个线程.根据浏览器引擎的实现,工作者线程可能与页面属于同一进程,也可能不属于.
+- **创建工作者线程的开销更大**:工作者线程有自己独立的事件循环,全局对象,事件处理程序和其他JS环境必须的特性.这些结构的代价不容忽视.工作者线程不能用于替代线程,其相对较重,不建议大量使用.工作者线程应该是长期运行的,启动成本比较高,每个实例占用的内存也比较大.
+
+### 工作者线程的类型
+`Web`工作者线程规范中定义了三种主要的工作者线程:
+
+- **专用工作者线程**
+
+专用工作者线程,通常简称为工作者线程,`Web Worker`或`Worker`,是一种实用的工具,可以让脚本单独创建一个JS线程,以执行委托的任务.专用者线程,顾名思义,只能被创建它的页面使用.
+
+- **共享工作者线程**
+
+共享工作者线程与专用工作者线程非常相似.主要区别是共享工作者线程可以被多个不同的上下文使用,包括不同的页面.任何与创建共享工作者线程的脚本同源的脚本,都可以向共享工作者线程发送消息或从中接收消息.
+
+- **服务工作者线程**
+
+服务工作者线程与专用工作者线程和共享工作者线程截然不同.它的主要用途是拦截,重定向和修改页面发出的请求,充当网络请求的仲裁者的角色.
+
+### WorkerGlobalScope
+在网页上,`window`对象可以向运行在其中的脚本暴露各种全局变量.在工作者线程内部,没有`window`的概念.这里的全局对象是`WorkerGlobalScope`的实例,通过`self`关键字暴露出来.
+
+#### WorkerGlobalScope属性和方法
+`self`上可用的属性是`window`对象上属性的严格子集.其中有些属性会返回特定于工作者线程的版本:
+- `navigator`:返回与工作者线程关联的`WorkerNavigator`.
+- `self`:返回`WorkerGlobalScope`对象.
+- `location`:返回与工作者线程关联的`WorkerLocation`.
+- `performance`:返回(只包含特定属性和方法的)`Performance`对象.
+- `console`:返回与工作者线程关联的`Console`对象;对API没有限制.
+- `caches`:返回与工作者线程关联的`CacheStorage`对象;对API没有限制.
+- `indexedDB`:返回`IDBFactory`对象.
+- `isSecureContext`:返回布尔值,表示工作者线程上下文是否安全.
+- `origin`:返回`WorkerGlobalScope`的源.
+
+类似地,`self`对象上暴露的一些方法也是`window`上方法的子集.这些`self`上的方法也与`window`上对应的方法操作一样:
+- `atob()`
+- `btoa()`
+- `clearInterval()`
+- `clearTimeout()`
+- `createImageBitmap()`
+- `fetch()`
+- `setInterval()`
+- `setTimeout()`
+
+`WorkerGlobalScope`还增加了新的全局方法`importScripts()`,只在工作者线程内可用.模块中不允许使用该函数,因为可以使用`import`代替,见[工作者模块](#工作者模块).
+
+更多有关工作者线程可以使用的函数和类,详见[MDN-Web Workers可以使用的函数和类](https://developer.mozilla.org/zh-CN/docs/Web/API/Web_Workers_API/Functions_and_classes_available_to_workers)
+
+#### WorkerGlobalScope的子类
+并不是所有地方都实现了`WorkerGlobalScope`.每种类型的工作者线程都使用了自己特定的全局对象,这继承自`WorkerGlobalScope`:
+- 专用工作者线程使用`DedicatedWorkerGlobalScope`.
+- 共享工作者线程使用`SharedWorkerGlobalScope`.
+- 服务工作者线程使用`ServiceWorkerGlobalScope`.
+
+## 专用工作者线程
 
