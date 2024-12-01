@@ -929,6 +929,27 @@
     - [并发问题](#并发问题)
     - [限制](#限制-2)
 - [模块](#模块)
+  - [理解模块模式](#理解模块模式)
+    - [模块标识符](#模块标识符)
+    - [模块依赖](#模块依赖)
+    - [模块加载](#模块加载)
+    - [入口](#入口)
+    - [异步依赖](#异步依赖)
+    - [动态依赖](#动态依赖)
+    - [静态分析](#静态分析)
+    - [循环依赖](#循环依赖)
+  - [凑合的模块模式](#凑合的模块模式)
+  - [使用ES6之前的模块加载器](#使用es6之前的模块加载器)
+  - [使用ES6模块](#使用es6模块)
+    - [模块标签及定义](#模块标签及定义)
+    - [模块加载](#模块加载-1)
+    - [模块行为](#模块行为)
+    - [模块导出](#模块导出)
+    - [模块导入](#模块导入)
+    - [模块转移导出](#模块转移导出)
+    - [工作者模块](#工作者模块)
+    - [向后兼容](#向后兼容)
+- [工作者线程](#工作者线程)
 
 # 认识JavaScript
 `JavaScript`包含: 核心(ECMAScript), 文档对象模型(DOM), 浏览器对象模型(BOM).
@@ -19401,4 +19422,524 @@ request.onsuccess = (event) => {
 这些数据都没有被加密,所以要注意不能使用它们存储敏感信息.
 
 # 模块
+## 理解模块模式
+将代码拆分为独立的块,然后再把这些块连接起来可以通过模块模式来实现.这种模式背后的思想很简单:把逻辑分块,各自封装,相互独立,每个块自行决定对外暴露什么,同时自行决定引入执行哪些外部代码.不同的实现和特性让这些基本的概念变得有点复杂,但这个基本的思想是所有JS模块系统的基础.
+
+### 模块标识符
+模块标识符是所有模块系统通用的概念.模块系统本质上是键值实体,其中每个模块都有个可用于引用它的标识符.这个标识符再模拟模块系统中可能是字符串,在原生实现的模块系统中可能是模块文件的实际路径.完善的模块系统应该能够无歧义地引用其他模块.
+
+将模块标识符解析为实际模块的过程中要根据模块系统对标识符的实现.原生浏览器模块标识符必须提供实际JS文件的路径.
+
+### 模块依赖
+模块系统的核心是管理依赖.
+
+### 模块加载
+在浏览器中,加载模块涉及几个步骤.加载模块涉及执行其中的代码,但必须是在所有依赖都加载并执行之后.如果浏览器没有收到依赖模块的代码,则必须发送请求并等待网络返回.收到模块代码之后,浏览器必须确定刚收到的模块是否也有依赖.然后递归地评估并加载所有依赖,直到所有依赖模块都加载完毕.只有整个依赖图都加载完成,才可以执行入口模块.
+
+### 入口
+相互依赖的模块必须指定一个模块作为入口,这也是所有代码执行的起点.因为JS是顺序执行的,并且是单线程的,所以代码必须有执行的起点.入口模块是可以有依赖的.
+
+模块依赖图是有向无环图,其加载顺序必须满足拓扑排序.
+
+模块加载是"阻塞的",前置操作必须完成才能执行后续操作.
+
+### 异步依赖
+有些模块之间不存在依赖关系,但对于同步加载,可能因为受限于网络原因,这种加载方式会导致没有依赖关系的模块需要等待另一个模块加载完成.
+
+使用异步加载让没有依赖的模块异步加载可以提高性能,这是ES6模块规范中实现的行为.
+
+### 动态依赖
+有些模块系统要求开发者在模块开始列出所有模块,而有些模块则允许开发者在程序结构中动态添加依赖:
+````JS
+if (loadCondition) {
+    require('./moduleA');
+}
+````
+
+### 静态分析
+模块中包含的发送到浏览器的JS代码经常会被静态分析,分析工具会检查代码结构并在不实际执行代码的情况下推断其行为.对静态分析友好的模块系统可以让模块打包系统更容易将代码处理为较少的文件.它还将支持在智能编辑器里智能自动完成.
+
+更复杂的模块行为,例如静态依赖,会导致静态分析更困难.不同模块系统和模块加载器具有不同层次的复杂度.至于模块依赖,额外的复杂度会导致相关工具更难预测模块在执行时到底需要哪些依赖.
+
+### 循环依赖
+要构建一个没有循环依赖的JS应用程序几乎是不可能的,因此包括CommonJS,AMD,ES6在内的所有模块系统都支持循环依赖.在包含循环依赖的应用程序中,模块加载顺序可能会出人意料.但只要适当地封装模块,使它们没有副作用,加载顺序就应该不会影响应用程序的运行.
+
+## 凑合的模块模式
+这是ES6之前的模块模式.不作赘述.
+
+## 使用ES6之前的模块加载器
+以下是ES6之前的模块模式.不作赘述,只作列举.
+
+- `CommonJS`
+- `AMD`(异步模块定义,Asynchronous Module Definition)
+- `UMD`(通用模块定义,Universal Module Definition)
+
+## 使用ES6模块
+[MDN上的模块教程](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Guide/Modules)
+
+动态加载模块是新标准,下文没有列出,可见[MDN-动态加载模块](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Guide/Modules#%E5%8A%A8%E6%80%81%E5%8A%A0%E8%BD%BD%E6%A8%A1%E5%9D%97).
+
+### 模块标签及定义
+ES6模块是作为一整块JS代码而存在的.带有`type="module"`属性的`<script>`标签会告诉浏览器相关代码应该作为模块执行,而不是作为传统的脚本执行.模块可以嵌入在网页中,也可以作为外部文件引入:
+````HTML
+<script type="module">
+    // 模块代码
+</script>
+<script type="module" src="path/to/myModule.js"></script>
+````
+
+**注意:使用`type="module"`属性的脚本基本是作为顶级模块**
+
+**注意:只能在模块内部使用`import`和`export`语句,而不是普通脚本文件.被入口模块导入的其他脚本一般不会写入HTML代码中,因此可以使用`import`和`export`语句.**
+
+即使与常规JS文件处理方式不同,JS模块文件也没有专门的内容类型.
+
+与传统脚本不同,所有模块都会像`<script defer>`加载的脚本一样按顺序执行,解析到`<script type="module">`标签后会立即下载模块文件,但执行会延迟到文档解析完成.无论对嵌入的模块代码还是外部引入的模块代码,都是这样.`<script type="module">`在页面中出现的顺序就是它们执行的顺序.与`<script defer>`一样,修改模块标签的位置,无论是在`<head>`还是在`<body>`中,只会影响文件什么时候加载,而不会影响模块什么时候加载.
+
+例如:
+````HTML
+<!-- 第二个执行 -->
+<script type="module" src="moduleA.js"></script>
+
+<!-- 第三个执行 -->
+<script type="module" src="moduleB.js"></script>
+
+<!-- 第一个执行 -->
+<script></script>
+````
+
+也可以给模块标签添加`async`属性.这样影响就是双重的:不仅模块执行顺序不再与`<script>`标签在页面中的顺序绑定,模块也不会等待文档完成解析才执行.不过,入口模块仍必须等待其依赖加载完成.
+
+与`<script type="module">`标签关联的ES6模块被认为是模块图中的入口模块(可以依赖其他JS文件).一个页面上有多少个入口模块没有限制,重复加载同一个模块也没有限制.同一个模块无论在一个页面中被加载多少次,也不管它是如何加载的,实际上都只会加载一次:
+````HTML
+<!-- moduleA在这个页面上只会被加载一次 -->
+<script type="module">
+    import './moduleA.js'
+</script>
+<script type="module">
+    import './moduleA.js'
+</script>
+<script type="module" src="./moduleA.js"></script>
+<script type="module" src="./moduleA.js"></script>
+````
+
+嵌入的模块定义代码不能使用`import`加载到其他模块.只有通过外部文件加载的模块才可以使用`import`加载.因此,嵌入代码只适合作为入口模块.
+
+在阅读下面的部分前,先看一个MDN给出的使用模块的[示例](https://github.com/mdn/js-examples/tree/main/module-examples/basic-modules).
+
+文件结构如下:
+```
+index.html
+main.js
+modules/
+    canvas.js
+    square.js
+```
+
+- **index.html**
+````HTML
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8">
+    <title>Basic JavaScript module example</title>
+    <style>
+      canvas {
+        border: 1px solid black;
+      }
+    </style>
+    <script type="module" src="main.js"></script>
+  </head>
+  <body>
+
+  </body>
+</html>
+````
+
+- **main.js**
+````JS
+import { create, createReportList } from './modules/canvas.js';
+import { name, draw, reportArea, reportPerimeter } from './modules/square.js';
+import randomSquare from './modules/square.js';
+
+let myCanvas = create('myCanvas', document.body, 480, 320);
+let reportList = createReportList(myCanvas.id);
+
+let square1 = draw(myCanvas.ctx, 50, 50, 100, 'blue');
+reportArea(square1.length, reportList);
+reportPerimeter(square1.length, reportList);
+
+// Use the default
+let square2 = randomSquare(myCanvas.ctx);
+````
+
+- **module/canvas.js**
+````JS
+function create(id, parent, width, height) {
+  let divWrapper = document.createElement('div');
+  let canvasElem = document.createElement('canvas');
+  parent.appendChild(divWrapper);
+  divWrapper.appendChild(canvasElem);
+
+  divWrapper.id = id;
+  canvasElem.width = width;
+  canvasElem.height = height;
+
+  let ctx = canvasElem.getContext('2d');
+
+  return {
+    ctx: ctx,
+    id: id
+  };
+}
+
+function createReportList(wrapperId) {
+  let list = document.createElement('ul');
+  list.id = wrapperId + '-reporter';
+
+  let canvasWrapper = document.getElementById(wrapperId);
+  canvasWrapper.appendChild(list);
+
+  return list.id;
+}
+
+export { create, createReportList };
+````
+
+**module/square.js**
+````JS
+const name = 'square';
+
+function draw(ctx, length, x, y, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(x, y, length, length);
+
+  return {
+    length: length,
+    x: x,
+    y: y,
+    color: color
+  };
+}
+
+function random(min, max) {
+   let num = Math.floor(Math.random() * (max - min)) + min;
+   return num;
+}
+
+function reportArea(length, listId) {
+  let listItem = document.createElement('li');
+  listItem.textContent = `${name} area is ${length * length}px squared.`
+
+  let list = document.getElementById(listId);
+  list.appendChild(listItem);
+}
+
+function reportPerimeter(length, listId) {
+  let listItem = document.createElement('li');
+  listItem.textContent = `${name} perimeter is ${length * 4}px.`
+
+  let list = document.getElementById(listId);
+  list.appendChild(listItem);
+}
+
+function randomSquare(ctx) {
+  let color1 = random(0, 255);
+  let color2 = random(0, 255);
+  let color3 = random(0, 255);
+  let color = `rgb(${color1},${color2},${color3})`
+  ctx.fillStyle = color;
+
+  let x = random(0, 480);
+  let y = random(0, 320);
+  let length = random(10, 100);
+  ctx.fillRect(x, y, length, length);
+
+  return {
+    length: length,
+    x: x,
+    y: y,
+    color: color
+  };
+}
+
+export { name, draw, reportArea, reportPerimeter };
+export default randomSquare;
+````
+
+### 模块加载
+ES6模块的独特之处在于,既可以通过浏览器原生加载,也可以与第三方加载器和构建工具一起加载.事实上,很多时候使用第三方工具可能会更方便.
+
+可以让浏览器从顶级模块加载整个依赖图,且是异步完成的.浏览器会解析入口模块,确定依赖,并发送对依赖的请求.这些文件通过网络返回后,浏览器就会解析它们的内容,确定它们的依赖,如果这些二级依赖还没有加载,则会发送更多请求.这个异步递归加载过程会持续到整个应用程序的依赖图都解析完毕.解析完依赖图,应用程序就可以正式加载模块了.
+
+### 模块行为
+ES6模块借用了`CommonJS`和`AMD`的很多优秀特性.包括:
+- 模块代码只在加载后执行.
+- 模块只能加载一次.
+- 模块是单例.
+- 模块可以定义公共接口,其他接口可以基于这个公共接口观察和交互.
+- 模块可以请求加载其他模块.
+- 支持循环依赖.
+
+ES6模块系统也增加了一些新行为:
+- ES6模块默认在严格模式下执行.
+- ES6模块不共享全局命名空间.
+- 模块顶级`this`的值是`undefined`(常规脚本中是`window`).
+- 模块中的`var`声明不会添加到`window`对象.
+- ES6模块是异步加载和执行的.
+
+浏览器运行时在应该知道应该把某个文件当成模块时,会有条件地按照上述ES6模块行为来施加限制.与`<script type="module">`关联或者通过`import`语句加载的JS文件会被认定为模块.
+
+### 模块导出
+ES6模块中,控制模块的哪些部分对外部可见的是`export`关键字.ES6模块支持两种导出:命名导出和默认导出.不同的导出方式对应不同的导入方式.
+
+`export`关键字用于声明一个值为命名导出.导出语句必须在模块顶级,不能嵌套在某个块中:
+````JS
+export ...  // OK
+if (condition) {
+    export ...  // Error
+}
+````
+
+导出值对模块内部JS的执行没有直接影响,因此`export`语句与导出值的相对位置或者`export`关键字在模块中出现的顺序没有限制.`export`语句甚至可以出现在它要导出的值之前:
+````JS
+const foo = 'foo';
+export { foo }; // OK
+
+export const foo = 'foo';   // OK
+
+export { foo }; // OK,但应该避免
+const foo = 'foo';
+````
+
+**命名导出**就好像模块是被导出值的容器.
+
+行内命名导出,顾名思义,可以在同一行执行变量声明.例如:
+````JS
+export const foo = 'foo';
+````
+
+变量声明跟导出可以不在一行.可以在`export`子句中执行声明并将标识符导出到模块的其他地方:
+````JS
+const foo = 'foo';
+export { foo };
+````
+
+导出时也可以提供别名,别名必须在`export`子句的大括号语法中指定.因此,声明值,导出值和为导出值提供别名不能在一行完成.例如:
+````JS
+const foo = 'foo';
+export { foo as myFoo };
+````
+
+命名导出可以有多个:
+````JS
+const baz = "baz";
+const qux = "qux"
+export const foo = "foo";
+export const bar = "bar";
+export { baz, qux as myQux };
+````
+
+**默认导出**就好像模块与被导出的值是一回事.默认导出使用`default`关键字将一个值声明为默认导出,每个模块都只能有一个默认导出.重复的默认导出会导致`SyntaxError`.
+
+下面的例子中,外部模块导入这个模块,则会让被导入模块本身的值为`foo`的值:
+````JS
+const foo = "foo";
+export default foo;
+````
+
+在别名中使用`default`也是默认导出,即使使用的是命名导出的语法:
+````JS
+const foo = "foo";
+export { foo as default };
+````
+
+命名导出和默认导出是不冲突的:
+````JS
+const foo = "foo";
+const bar = "bar";
+const baz = "baz";
+export { foo };
+export { bar as default, baz };
+````
+
+ES6规范对不同形式的`export`语句中可以使用什么,不可以使用什么规定了限制.某些形式允许声明和赋值,某些形式只允许表达式,而某些形式则只允许简单标识符.注意,有的形式使用了分号,有的则没有:
+````JS
+// 命名行内导出
+export const baz = 'baz';
+export const foo = 'foo', bar = 'bar';
+export function foo() {}
+export function* foo() {}
+export class Foo {}
+
+// 命名子句导出
+export { foo }; // 这里的标识符可以指的是变量,函数或者类声明
+export { foo, bar };
+export { foo as myFoo, bar };
+
+// 默认导出
+export default 'foo';
+export default 123;
+export default /[a-z]*/;
+export default { foo: 'foo' };
+export { foo /* 这个不是默认导入,后面的才是 */ , bar as default };
+export default foo;
+export default function() {}
+export default function foo() {}
+export default function*() {}
+export default class {}
+
+// 会导致错误的不同形式:
+// 行内默认导出中不能出现变量声明
+export default const foo = 'bar';
+
+// 只有标识符可以出现在export子句中
+export { 123 as foo };
+export 123;
+
+// 别名只能在export子句中出现
+export const foo = 'foo' as myFoo;
+````
+
+### 模块导入
+模块可以通过使用`import`关键字使用其他模块导出的值.与`export`类似,`import`必须出现在模块的顶级:
+````JS
+import ...  // OK
+if (condition) {
+    import ...  // Error
+}
+````
+
+`import`语句被提升到模块顶部.因此,`import`语句与使用导入值的语句的相对位置并不重要.不过,还是推荐把导入语句放在模块顶部:
+````JS
+import { foo } from "./fooModule.js";
+console.log(foo);   // OK
+
+console.log(foo);
+import { foo } from "./fooModule.js";   // OK,但应该避免
+````
+
+模块标识符可以是相对于当前模块的相对路径,也可以是指向模块文件的绝对路径.它必须是纯字符串,不能是动态计算的结果.例如,不能是拼接的字符串.
+
+如果在浏览器中通过标识符原生加载模块,则文件必须带有`.js`扩展名(或者[`.mjs`](https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Guide/Modules#.mjs_%E4%B8%8E_.js)),不然可能无法正确解析.不过,如果是通过构建工具或第三方模块加载器打包或解析的ES6模块,则可能不需要包含文件扩展名.
+````JS
+import ... from "./bar.js";
+import ... from "../bar.js";
+import ... from "/bar.js";  // 这指的是根目录下的bar.js
+````
+
+不是必须通过导出的成员才能导入模块.如果不需要模块的特定导出,但仍想加载和执行模块以利用其副作用(即模块所导出的东西或者模块内声明的变量,函数或者类都不能使用,但模块被执行了,因此像`console.log()`语句或者对`HTMLElement`的修改等都有实际作用),可以只通过路径加载它:
+````JS
+import './foo.js';
+````
+
+导入对于模块而言是只读的,实际上相当于`const`声明的变量.在使用`*`执行批量导入时,赋值给别名的命名导入就好像使用`Object.freeze()`冻结过一样(也就是导出`foo`,使用`Foo`作为别名导入`*`,则`Foo`当中的不能添加,删除,或修改任何属性,例如`Foo.foo`,但修改`Foo.foo.bar`是可以的).直接修改导出的值是不可能的,但可以修改导出对象的属性.要修改导出的值,必须使用有内部变量和属性访问权限的导出方法:
+````JS
+import foo, * as Foo from './foo.js';
+foo = 'foo';        // Error
+Foo.foo = 'foo';    // Error
+foo.bar = 'bar';    // OK
+````
+
+命名导出和默认导出的区别也反映在它们的导入上.命名导出可以使用`*`批量获取并赋值给保存导出集合的别名,而无需列出每个表示符:
+````JS
+const foo = 'foo', bar = 'bar', baz = 'baz';
+export { foo, bar, baz };
+// ---- foo.js ^^^ / vvv main.js ----
+import * as Foo from './foo.js';
+console.log(Foo.foo);
+console.log(Foo.bar);
+console.log(Foo.baz);
+````
+
+要指定别名,需要把标识符放在`import`子句中.使用`import`子句可以为导入的值指定别名:
+````JS
+import { foo, bar, baz as myBaz } from './foo.js';
+console.log(foo);   // foo
+console.log(bar);   // bar
+console.log(myBaz); // baz
+````
+
+默认导出就好像整个模块就是导出的值一样.可以使用`default`关键字并提供别名来导入.也可以不使用大括号,此时指定的标识符就是默认导出的别名:
+````JS
+// 等效
+import { default as foo } from './foo.js';
+import foo from './foo.js';
+````
+
+如果模块同时导出了命名导出和默认导出,则可以在`import`语句中同时取得它们.可以依次列出特定导出的标识符来取得,也可以使用`*`来取得:
+````JS
+import foo, { bar, baz } from './foo.js';
+import { default as foo, bar, baz } from './foo.js';
+import foo, * as Foo from './foo.js';
+````
+
+### 模块转移导出
+模块导入的值可以直接通过管道转移到导出.此时,也可以将默认导出转换为命名导出,或者相反.
+
+如果想把一个模块的所有命名导出集中在一块,可以像下面这样:
+````JS
+// bar.js
+export * from './foo.js';
+````
+
+这样,`foo.js`中的命名导出都会出现在导入`bar.js`的模块中.如果`foo.js`有默认导出,则该语法会忽略它.使用此语法也要注意导出名称是否冲突.如果`foo.js`导出`baz`,`bar.js`也导出`baz`,则最终导出的是`bar.js`中的值.这个"重写"是静默发生的:
+````JS
+// foo.js
+export const baz = 'origin:foo';
+
+// bar.js
+export * from './foo.js';
+export const baz = 'origin:bar';
+
+// main.js
+import { baz } from './bar.js';
+console.log(baz);   // origin:bar
+````
+
+此外也可以明确列出要从外部模块转移本地导出的值.该语法支持使用别名:
+````JS
+export { foo, bar as myBar } from './foo.js';
+````
+
+类似地,外部模块的默认导出可以重用为当前模块的默认导出:
+````JS
+export { default } from './foo.js';
+````
+
+这样不会复制导出的值,只是把导入的引用传给了原始模块.在原始模块中,导入的值仍然是可用的,与修改导入相关的限制也适用于再次导出的导入.
+
+在重新导出时,还可以在导入模块修改命名或默认导出的角色.比如,可以像下面这样将命名导出指定为默认导出:
+````JS
+export { foo as default } from './foo.js';
+````
+
+### 工作者模块
+ES6模块与`Worker`实例完全兼容.在实例化时,可以给工作者传入一个指向模块文件的路径,与传入常规脚本文件一样.`Worker`构造函数接收第二个参数,用于说明传入的是模块文件.
+
+下面是两种类型的`Worker`的实例化行为:
+````JS
+// 第二个参数默认为{ type: 'classic' }
+const scriptWorker = new Worker('scriptWorker.js');
+const moduleWorker = new Worker('moduleWorker.js', { type: 'module' });
+````
+
+在基于模块的工作者内部,`self.importScripts()`方法通常用于在基于脚本的工作者中加载外部脚本,调用它会抛出错误.这是因为模块的`import`行为包含了`importScripts()`.
+
+### 向后兼容
+浏览器在遇到`<script>`标签上无法识别的`type`属性时会拒绝执行其内容.对于不支持模块的浏览器,这意味着`<script type="module">`不会被执行.
+
+支持ES6模块的浏览器也会识别`nomodule`属性.此属性通知支持ES6模块的浏览器不执行脚本.不支持模块的浏览器无法识别该属性,从而忽略这个属性的存在.
+
+````HTML
+<!-- 支持模块的浏览器会执行这段脚本 -->
+<!-- 不支持模块的浏览器不会执行这段脚本 -->
+<script type="module" src="module.js"></script>
+
+<!-- 支持模块的浏览器不会执行这段脚本 -->
+<!-- 不支持模块的浏览器会执行这段脚本 -->
+<script nomodule src="script.js"></script>
+````
+
+# 工作者线程
 
