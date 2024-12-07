@@ -726,6 +726,10 @@
   - [Atomics与SharedArrayBuffer](#atomics与sharedarraybuffer)
     - [SharedArrayBuffer](#sharedarraybuffer)
     - [原子操作基础](#原子操作基础)
+      - [算数及位操作方法](#算数及位操作方法)
+      - [原子读和写](#原子读和写)
+      - [原子交换](#原子交换)
+      - [原子Futex操作与加锁](#原子futex操作与加锁)
   - [跨上下文消息](#跨上下文消息)
   - [Encoding API](#encoding-api)
     - [文本编码](#文本编码)
@@ -1024,7 +1028,6 @@
       - [处理通知事件](#处理通知事件)
       - [订阅推送事件](#订阅推送事件)
       - [处理推送事件](#处理推送事件)
-- [最佳实践](#最佳实践)
 
 # 认识JavaScript
 `JavaScript`包含: 核心(ECMAScript), 文档对象模型(DOM), 浏览器对象模型(BOM).
@@ -15523,9 +15526,117 @@ for (const worker of workers) {
 // Final buffer value: 2145106
 ````
 
-### 原子操作基础
+*有关其详细使用,详见[工作者线程-工作者线程数据传输-SharedArrayBuffer](#工作者线程数据传输)*
 
-/// TODO
+### 原子操作基础
+任何全局上下文都有`Atomics`对象,这个对象上暴露了用于执行线程安全操作的一套静态方法,其中多数方法以一个`TypedArray`实例(一个`SharedArrayBuffer`的引用)作为第一个参数,以相关操作数作为后续参数.
+
+#### 算数及位操作方法
+`Atomics API`提供了一套简单的方法用于执行就地修改操作.这些方法被定义为`AtomicReadModifyWrite`操作.在底层,这些方法都会从`SharedArrayBuffer`中的某个位置读取值,然后执行算数或位操作,然后再把计算结果写回相同的位置.这些操作的原子本质意味着上述读取,修改,写回操作会按照顺序执行,不会被其他线程中断.
+
+例如:
+````JS
+let sharedArrayBuffer = new SharedArrayBuffer(1);
+let typedArray = new Uint8Array(sharedArrayBuffer);
+console.log(typedArray);    // Uint8Array [0]
+const index = 0;
+const increment = 5;
+Atomics.add(typedArray, index, increment);  // 对索引0处的值执行原子加5
+````
+
+可用的算数和位方法:
+`Atomics.add(typedArray, index, num)`:原子的`typedArray[index] += num`.
+`Atomics.sub(typedArray, index, num)`:原子的`typedArray[index] -= num`.
+`Atomics.or(typedArray, index, num)`:原子的`typedArray[index] |= num`.
+`Atomics.and(typedArray, index, num)`:原子的`typedArray[index] &= num`.
+`Atomics.xor(typedArray, index, num)`:原子的`typedArray[index] ^= num`.
+
+上面线程不安全的例子可以改写成这样:
+````JS
+const workerScript = `
+self.onmessage = ({data}) => {
+    const view = new Uint32Array(data);
+    for (let i = 0; i < 1E6; ++i) {
+        // 线程安全的加操作
+        Atomics.add(view, 0, 1);
+    }
+    self.postMessage(null);
+};
+`;
+const workerScriptBlobUrl = URL.createObjectURL(new Blob([workerScript]));
+const workers = [];
+for (let i = 0; i < 4; ++i) {
+    workers.push(new Worker(workerScriptBlobUrl));
+}
+let responeCount = 0;
+for (const worker of workers) {
+    workers.onmessage = () => {
+        if (++responseCount == workers.length) {
+            console.log(`Final buffer value: ${view[0]}`);
+        }
+    };
+}
+const sharedArrayBuffer = new SharedArrayBuffer(4);
+const view = new Uint32Array(sharedArrayBuffer);
+view[0] = 1;
+for (const worker of workers) {
+    worker.postMessage(sharedArrayBuffer);
+}
+// (期待结果为4000001)
+// Final buffer value: 4000001
+````
+
+#### 原子读和写
+浏览器的JS编译器和CPU架构本身都有权限重排指令以提升程序执行效率.正常情况下,JS的单线程环境是可以随时进行这种优化的.但多线程下的指令重排可能导致资源争用,而且极难排错.
+
+`Atomics API`通过两种主要方式解决了这个问题:
+- 所有原子指令互相之间的顺序永远不会重排.
+- 使用原子读或原子写保证所有指令(包括原子和非原子指令)都不会相对于原子读/写重新排序.这意味着位于原子读/写之前的所有指令会在原子读/写发生前完成,而位于原子读/写之后的所有指令会在原子读/写完成后才会开始.
+
+除了读写缓冲区的值,`Atomics.load()`和`Atomics.store()`还可以创建"代码围栏".JS引擎保证非原子指令可以相对于`load()`或`store()`*本地*重排,但这个重排不会侵犯原子读/写的边界:
+````JS
+const sharedArrayBuffer = new SharedArrayBuffer(4);
+const view = new Uint32Array(sharedArrayBuffer);
+view[0] = 1;    // 执行非原子写
+// 非原子写可以保证在这个读操作之前完成,因此这里一定会读到1.(直接读也会读到1来着)
+console.log(Atomics.load(view, 0)); // 1
+Atomics.store(view, 0, 2);
+// 非原子读可以保证在原子写完成后发生,因此这里一定会读到2.(直接写也会读到2来着)
+console.log(view[0]);   // 2
+````
+
+#### 原子交换
+为了保证连续,不间断的先读后写,`Atomics API`提供了两种方法:`exchange()`和`compareExchange()`.`Atomics.exchange()`执行简单的交换,以保证其他线程不会中断值的交换:
+````JS
+const sharedArrayBuffer = new SharedArrayBuffer(4);
+const view = new Uint32Array(sharedArrayBuffer);
+// 在索引0处写入3
+Atomics.store(view, 0, 3);
+// 从索引0处读取值,然后在索引0处写入4,这整个操作都是原子的
+console.log(Atomics.exchange(view, 0, 4));  // 3
+// 从索引0处读取值
+console.log(Atomics.load(view, 0)); // 4
+````
+
+在多线程程序中,一个线程可能只希望在上次读取某个值之后没有其他线程修改该值的情况下才对共享缓冲区执行操作.如果这个值没有修改,这个线程就可以安全地写入更新后的值.如果这个值被修改了,那么执行写操作将会破坏其他线程计算的值.对于这种任务,`Atomics API`提供了`compareExchange()`方法.这个方法只在目标索引处的值与预期值匹配时才会执行写操作.
+
+因此,调用`Atomics.compareExchange(typedArray, index, initial, result)`相当于执行原子的:
+````JS
+let ret = typedArray[index];
+if (typedArray[index] === initial) {
+    typedArray[index] = result;
+}
+return ret;
+````
+
+#### 原子Futex操作与加锁
+如果没有某种锁机制,多线程程序就无法支持复杂需求.为此,`Atomics API`提供了模仿`Linux Futex`(快速用户空间互斥量, fast user-space mutex)的方法.这些方法本身虽然非常简单,但可以作为更复杂锁机制的基本组件.
+
+*注意:所有元素Futex操作只能用于`Int32Array`视图.而且,也只能用在工作者线程内部.*
+
+`Atomics.wait(typedArray, index, initial, timeout)`:若`typedArray[index]`处的值为`inital`,则等待`notify()`唤醒此工作者线程,等待`timeout`毫秒后超时(超时后取消等待并继续执行).
+
+`Atomics.notify(typedArray, index, count)`:唤醒等待`typedArray[index]`的工作者线程,唤醒的数量为`count`(可选值,默认为`Infinity`).
 
 ## 跨上下文消息
 跨文档消息,有时候也简称为XDM(cross-document messaging),是一种在不同执行上下文(如不同工作线程或不同源的页面)间传递信息的能力.
@@ -21817,6 +21928,4 @@ self.onnotificationclick = ({notification}) => {
     clients.openWindow('https://www.example.org/clicked-notification');
 };
 ````
-
-# 最佳实践
 
