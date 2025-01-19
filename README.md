@@ -10,6 +10,8 @@
 本笔记引用了别人的库,在此感谢:
 - [AnthonyCalandra/modern-cpp-features](https://github.com/AnthonyCalandra/modern-cpp-features)
 - [necolas/normalize.css](https://github.com/necolas/normalize.css)
+- [xiaoweiChen/Modern-CMake-for-Cpp-2ed](https://github.com/xiaoweiChen/Modern-CMake-for-Cpp-2ed)
+- [PacktPublishing/Modern-CMake-for-Cpp-2E](https://github.com/PacktPublishing/Modern-CMake-for-Cpp-2E)
 
 如果你发现了任何错误或者想帮助我完善笔记,可以PR.
 

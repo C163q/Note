@@ -5,3 +5,11 @@
 [submodule "Web/CSS/collection/normalize"]
 	path = Web/CSS/collection/normalize
 	url = https://github.com/necolas/normalize.css
+
+[submodule "C_Cpp/CMake/book_translated_Modern-CMake-for-Cpp-2ed"]
+	path = C_Cpp/CMake/book_translated_Modern-CMake-for-Cpp-2ed
+	url = https://github.com/xiaoweiChen/Modern-CMake-for-Cpp-2ed.git
+
+[submodule "C_Cpp/CMake/book_source-code_Modern-CMake-for-Cpp-2ed"]
+	path = C_Cpp/CMake/book_source-code_Modern-CMake-for-Cpp-2ed
+	url = https://github.com/PacktPublishing/Modern-CMake-for-Cpp-2E.git
